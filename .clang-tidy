@@ -1,4 +1,13 @@
 ---
+# Project-wide clang-tidy configuration. Directory-scoped .clang-tidy files under
+# src/platform/mac/ and src/tests/ narrow this further where OS interop requires it.
+#
+# Disabled checks, and why:
+#   avoid-do-while                 the CHECK test macro requires do { } while (false)
+#   avoid-pragma-once              #pragma once is used consistently; this is a macOS-only tool
+#   avoid-const-or-ref-data-members  use cases hold const references to their ports by
+#                                    design: they are constructed in place and consumed
+#                                    immediately, so non-null beats assignable
 Checks: >
   -*,
   bugprone-*,
@@ -13,7 +22,8 @@ Checks: >
   -readability-identifier-length,
   -readability-magic-numbers,
   -cppcoreguidelines-avoid-do-while,
-  -portability-avoid-pragma-once
+  -portability-avoid-pragma-once,
+  -cppcoreguidelines-avoid-const-or-ref-data-members
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*/src/.*\.hpp$'

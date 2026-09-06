@@ -1,0 +1,6 @@
+# The macOS adapters read structures returned by libproc. proc_fdinfo and
+# socket_fdinfo expose their IPv4/IPv6 addresses through a union, which is the
+# shape the OS defines; copying it into a std::variant would add a translation
+# layer without making anything safer.
+Checks: >
+  -cppcoreguidelines-pro-type-union-access
