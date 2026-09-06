@@ -1,7 +1,8 @@
 #include "use_cases/kill_process.hpp"
 
+#include "use_cases/listener_lookup.hpp"
+
 #include <chrono>
-#include <set>
 
 namespace devdock {
 
@@ -15,14 +16,14 @@ namespace devdock {
         std::uint16_t port,
         TerminationMode mode
     ) const {
-        auto listeners = port_inspector_.listening_ports();
+        auto scan = port_inspector_.listening_ports();
 
-        if (!listeners) {
-            return std::unexpected(listeners.error());
+        if (!scan) {
+            return std::unexpected(scan.error());
         }
 
         auto owner =
-            find_unique_owner(*listeners, port);
+            unique_owner_of(*scan, port);
 
         if (!owner) {
             return std::unexpected(
@@ -89,56 +90,20 @@ namespace devdock {
         );
     }
 
-    Result<ProcessId>
-    KillProcess::find_unique_owner(
-        const std::vector<ListeningPort>& listeners,
-        std::uint16_t port
-    ) {
-        std::set<ProcessId> owners;
-
-        for (const auto& listener : listeners) {
-            if (listener.port == port) {
-                owners.insert(
-                    listener.pid
-                );
-            }
-        }
-
-        if (owners.empty()) {
-            return std::unexpected(
-                Error{
-                    .code = ErrorCode::not_found,
-                    .message = "No process is listening on port " + std::to_string(port) + ".",
-                }
-            );
-        }
-
-        if (owners.size() > 1) {
-            return std::unexpected(
-                Error{
-                    .code = ErrorCode::ambiguous_target,
-                    .message = "Multiple processes are listening on port " + std::to_string(port) + "; use `devdock kill --pid <pid>` instead.",
-                }
-            );
-        }
-
-        return *owners.begin();
-    }
-
     Result<void> KillProcess::confirm_owner(
         std::uint16_t port,
         const ProcessIdentity& identity
     ) const {
-        auto listeners =
+        auto scan =
             port_inspector_.listening_ports();
 
-        if (!listeners) {
+        if (!scan) {
             return std::unexpected(
-                listeners.error()
+                scan.error()
             );
         }
 
-        const auto owner = find_unique_owner(*listeners, port);
+        const auto owner = unique_owner_of(*scan, port);
 
         if (!owner && owner.error().code != ErrorCode::not_found) {
             return std::unexpected(owner.error());

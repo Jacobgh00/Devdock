@@ -142,17 +142,22 @@ namespace {
 
         MacPortInspector inspector;
 
-        const auto listeners =
+        const auto scan =
             inspector.listening_ports();
 
         CHECK(
-            listeners.has_value()
+            scan.has_value()
         );
+
+        if (!scan) {
+            ::close(socket_fd);
+            return;
+        }
 
         bool found = false;
 
         for (
-            const auto& listener : *listeners) {
+            const auto& listener : scan->listeners) {
             if (
                 listener.port == port && listener.pid == ::getpid()
             ) {
@@ -164,6 +169,30 @@ namespace {
         CHECK(found);
 
         ::close(socket_fd);
+    }
+
+    void port_inspector_reports_scan_coverage() {
+        MacPortInspector inspector;
+
+        const auto scan = inspector.listening_ports();
+
+        CHECK(scan.has_value());
+
+        if (!scan) {
+            return;
+        }
+
+        CHECK(scan->scanned_processes > 0);
+
+        CHECK(
+            scan->uninspectable_processes <= scan->scanned_processes
+        );
+
+        // The test process is always inspectable by itself, so a scan can never
+        // report every process as invisible.
+        CHECK(
+            scan->uninspectable_processes < scan->scanned_processes
+        );
     }
 
     void check_stop_rejects_stale_identity(
@@ -327,6 +356,8 @@ int main() {
         process_inspector_reads_current_process();
 
         port_inspector_finds_current_listener();
+
+        port_inspector_reports_scan_coverage();
 
         controller_refuses_changed_identity();
 

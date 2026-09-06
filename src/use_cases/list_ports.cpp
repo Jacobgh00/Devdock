@@ -1,40 +1,27 @@
 #include "list_ports.hpp"
 
+#include "use_cases/listener_enrichment.hpp"
+
 #include <algorithm>
-#include <optional>
-#include <utility>
 
 namespace devdock {
-    namespace {
-        std::optional<Process> inspect_process(
-            const ProcessInspector& inspector,
-            ProcessId pid
-        ) {
-            auto process = inspector.inspect(pid);
-
-            if (!process) {
-                return std::nullopt;
-            }
-
-            return std::move(*process);
-        }
-    }
 
     Result<std::vector<PortDetails>> ListPorts::execute() const {
-        auto listeners = port_inspector_.listening_ports();
+        auto scan = port_inspector_.listening_ports();
 
-        if (!listeners) {
-            return std::unexpected(listeners.error());
+        if (!scan) {
+            return std::unexpected(scan.error());
         }
 
-        std::vector<PortDetails> result;
-        result.reserve(listeners->size());
+        auto result =
+            enrich_listeners(
+                process_inspector_,
+                scan->listeners
+            );
 
-        for (const auto& listener : *listeners) {
-            result.push_back(PortDetails{.listener = listener, .process = inspect_process(process_inspector_, listener.pid)});
-        }
-
-        std::ranges::sort(
+        // Stable: the adapter already orders listeners by port, PID, protocol and
+        // address, and that order is what rows of the same port keep.
+        std::ranges::stable_sort(
             result,
             {},
             [](const PortDetails& details) {

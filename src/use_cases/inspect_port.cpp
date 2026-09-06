@@ -1,56 +1,33 @@
 #include "use_cases/inspect_port.hpp"
 
-#include <optional>
-#include <utility>
+#include "use_cases/listener_enrichment.hpp"
+#include "use_cases/listener_lookup.hpp"
 
 namespace devdock {
 
-    namespace {
-        std::optional<Process> inspect_process(
-            const ProcessInspector& inspector,
-            ProcessId pid
-        ) {
-            auto process = inspector.inspect(pid);
-
-            if (!process) {
-                return std::nullopt;
-            }
-
-            return std::move(*process);
-        }
-    }
-
     Result<std::vector<PortDetails>> InspectPort::execute(std::uint16_t port) const {
-        auto listeners =
+        const auto scan =
             port_inspector_.listening_ports();
 
-        if (!listeners) {
+        if (!scan) {
             return std::unexpected(
-                listeners.error()
+                scan.error()
             );
         }
 
-        std::vector<PortDetails> matches;
+        const auto matches =
+            listeners_on(*scan, port);
 
-        for (const auto& listener : *listeners) {
-            if (listener.port != port) {
-                continue;
-            }
-
-            matches.push_back(PortDetails{
-                .listener = listener,
-                .process = inspect_process(process_inspector_, listener.pid),
-            });
+        if (!matches) {
+            return std::unexpected(
+                matches.error()
+            );
         }
 
-        if (matches.empty()) {
-            return std::unexpected(Error{
-                .code = ErrorCode::not_found,
-                .message = "No process is listening on port " + std::to_string(port) + ".",
-            });
-        }
-
-        return matches;
+        return enrich_listeners(
+            process_inspector_,
+            *matches
+        );
     }
 
 }

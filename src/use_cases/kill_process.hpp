@@ -48,11 +48,6 @@ namespace devdock {
         ) const;
 
     private:
-        [[nodiscard]] static Result<ProcessId> find_unique_owner(
-            const std::vector<ListeningPort>& listeners,
-            std::uint16_t port
-        );
-
         [[nodiscard]] Result<void> confirm_owner(
             std::uint16_t port,
             const ProcessIdentity& identity

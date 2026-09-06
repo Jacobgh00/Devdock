@@ -52,6 +52,21 @@ Destructive commands also refuse to:
 - stop DevDock itself
 - stop a process owned by another user
 
+## Visibility
+
+DevDock inspects only the processes your user account is allowed to inspect, so a
+port held by another user — a system daemon, for example — is not listed. When a
+port has no listener that DevDock can see, it says so and reports how much of the
+scan was invisible:
+
+```
+$ devdock port 22
+devdock: No visible process is listening on port 22. 255 of 617 processes could not be inspected by this user.
+```
+
+A scan is a best-effort walk over the process list, not an atomic snapshot: a
+process that exits during the scan is simply skipped.
+
 ## Exit codes
 
 | Code | Meaning |

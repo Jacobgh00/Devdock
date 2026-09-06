@@ -6,7 +6,7 @@ namespace devdock {
 
     class MacPortInspector final : public PortInspector {
     public:
-        [[nodiscard]] Result<std::vector<ListeningPort>>
+        [[nodiscard]] Result<PortScan>
         listening_ports() const override;
     };
 

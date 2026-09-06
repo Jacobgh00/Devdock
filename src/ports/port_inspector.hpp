@@ -1,9 +1,7 @@
 #pragma once
 
 #include "domain/error.hpp"
-#include "domain/listening_port.hpp"
-
-#include <vector>
+#include "domain/port_scan.hpp"
 
 namespace devdock {
     class PortInspector {
@@ -18,6 +16,6 @@ namespace devdock {
         PortInspector& operator=(PortInspector&&) = default;
 
     public:
-        [[nodiscard]] virtual Result<std::vector<ListeningPort>> listening_ports() const = 0;
+        [[nodiscard]] virtual Result<PortScan> listening_ports() const = 0;
     };
 }

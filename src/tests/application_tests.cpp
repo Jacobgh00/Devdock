@@ -1,3 +1,4 @@
+#include "domain/port_scan.hpp"
 #include "ports/port_inspector.hpp"
 #include "ports/process_controller.hpp"
 #include "ports/process_inspector.hpp"
@@ -47,12 +48,15 @@ namespace {
             std::vector<ListeningPort>>
             snapshots;
 
+        std::size_t scanned_processes = 1;
+        std::size_t uninspectable_processes = 0;
+
         std::optional<Error> error;
         std::size_t error_on_call = 0;
 
         mutable std::size_t calls = 0;
 
-        Result<std::vector<ListeningPort>>
+        Result<PortScan>
         listening_ports() const override {
             if (error && calls >= error_on_call) {
                 return std::unexpected(
@@ -61,8 +65,7 @@ namespace {
             }
 
             if (snapshots.empty()) {
-                return std::vector<
-                    ListeningPort>{};
+                return make_scan({});
             }
 
             const auto index =
@@ -73,7 +76,20 @@ namespace {
 
             ++calls;
 
-            return snapshots.at(index);
+            return make_scan(
+                snapshots.at(index)
+            );
+        }
+
+    private:
+        [[nodiscard]] PortScan make_scan(
+            std::vector<ListeningPort> listeners
+        ) const {
+            return PortScan{
+                .listeners = std::move(listeners),
+                .scanned_processes = scanned_processes,
+                .uninspectable_processes = uninspectable_processes,
+            };
         }
     };
 
@@ -85,9 +101,14 @@ namespace {
             Process>
             processes;
 
+        mutable std::vector<ProcessId>
+            inspected;
+
         [[nodiscard]] Result<Process> inspect(
             ProcessId pid
         ) const override {
+            inspected.push_back(pid);
+
             const auto found =
                 processes.find(pid);
 
@@ -243,6 +264,200 @@ namespace {
                  .process
                  .has_value()
         );
+    }
+
+    void list_ports_inspects_each_process_once() {
+        FakePortInspector ports;
+
+        ports.snapshots = {
+            {
+                make_listener(5173, 42),
+                make_listener(5174, 42),
+                make_listener(6379, 42),
+            },
+        };
+
+        FakeProcessInspector processes;
+        processes.processes.emplace(42, make_process(42));
+
+        const auto result = ListPorts{ports, processes}.execute();
+
+        CHECK(result.has_value());
+        CHECK(processes.inspected.size() == 1);
+    }
+
+    void list_ports_repeats_metadata_for_every_row_of_one_process() {
+        FakePortInspector ports;
+
+        ports.snapshots = {
+            {
+                make_listener(5173, 42),
+                make_listener(5174, 42),
+            },
+        };
+
+        FakeProcessInspector processes;
+        processes.processes.emplace(42, make_process(42));
+
+        const auto result = ListPorts{ports, processes}.execute();
+
+        CHECK(result.has_value());
+
+        if (!result || result->size() != 2) {
+            CHECK(false);
+            return;
+        }
+
+        for (const auto& details : *result) {
+            CHECK(details.process.has_value());
+
+            if (details.process) {
+                CHECK(details.process->name == "node");
+            }
+        }
+    }
+
+    void inspect_port_inspects_each_process_once() {
+        FakePortInspector ports;
+
+        ports.snapshots = {
+            {
+                make_listener(5173, 42),
+                ListeningPort{
+                    .port = 5173,
+                    .protocol = Protocol::tcp6,
+                    .address = "::1",
+                    .pid = 42,
+                },
+            },
+        };
+
+        FakeProcessInspector processes;
+        processes.processes.emplace(42, make_process(42));
+
+        const auto result = InspectPort{ports, processes}.execute(5173);
+
+        CHECK(result.has_value());
+        CHECK(processes.inspected.size() == 1);
+    }
+
+    void inspect_port_inspects_only_the_matching_process() {
+        FakePortInspector ports;
+
+        ports.snapshots = {
+            {
+                make_listener(5173, 42),
+                make_listener(6379, 99),
+            },
+        };
+
+        FakeProcessInspector processes;
+        processes.processes.emplace(42, make_process(42));
+        processes.processes.emplace(99, make_process(99, "redis"));
+
+        const auto result = InspectPort{ports, processes}.execute(5173);
+
+        CHECK(result.has_value());
+        CHECK(processes.inspected == std::vector<ProcessId>{42});
+    }
+
+    void limit_visibility(FakePortInspector& ports) {
+        ports.scanned_processes = 148;
+        ports.uninspectable_processes = 58;
+    }
+
+    void inspect_port_reports_plain_absence_when_the_scan_is_complete() {
+        FakePortInspector ports;
+
+        ports.snapshots = {{}};
+        ports.scanned_processes = 148;
+        ports.uninspectable_processes = 0;
+
+        FakeProcessInspector processes;
+
+        const auto result = InspectPort{ports, processes}.execute(5173);
+
+        CHECK(!result.has_value());
+
+        if (!result) {
+            CHECK(result.error().code == ErrorCode::not_found);
+
+            CHECK(
+                result.error().message == "No process is listening on port 5173."
+            );
+        }
+    }
+
+    void inspect_port_reports_limited_visibility_for_an_absent_listener() {
+        FakePortInspector ports;
+
+        ports.snapshots = {{}};
+        limit_visibility(ports);
+
+        FakeProcessInspector processes;
+
+        const auto result = InspectPort{ports, processes}.execute(22);
+
+        CHECK(!result.has_value());
+
+        if (!result) {
+            CHECK(result.error().code == ErrorCode::not_found);
+
+            CHECK(
+                result.error().message ==
+                "No visible process is listening on port 22. "
+                "58 of 148 processes could not be inspected by this user."
+            );
+        }
+    }
+
+    void kill_by_port_reports_limited_visibility_for_an_absent_listener() {
+        FakePortInspector ports;
+
+        ports.snapshots = {{}};
+        limit_visibility(ports);
+
+        FakeProcessInspector processes;
+        FakeProcessController controller;
+
+        const auto result = KillProcess{ports, processes, controller}
+                                .by_port(22, TerminationMode::graceful);
+
+        CHECK(!result.has_value());
+
+        if (!result) {
+            CHECK(result.error().code == ErrorCode::not_found);
+
+            CHECK(
+                result.error().message ==
+                "No visible process is listening on port 22. "
+                "58 of 148 processes could not be inspected by this user."
+            );
+        }
+
+        CHECK(controller.calls.empty());
+    }
+
+    void kill_by_port_stops_a_visible_owner_despite_an_incomplete_scan() {
+        FakePortInspector ports;
+
+        ports.snapshots = {
+            {make_listener(5173, 42)},
+            {make_listener(5173, 42)},
+        };
+        limit_visibility(ports);
+
+        FakeProcessInspector processes;
+        const auto process = make_process(42);
+        processes.processes.emplace(42, process);
+
+        FakeProcessController controller;
+
+        const auto result = KillProcess{ports, processes, controller}
+                                .by_port(5173, TerminationMode::graceful);
+
+        CHECK(result.has_value());
+        CHECK(controller.calls.size() == 1);
     }
 
     void inspect_port_returns_not_found() {
@@ -568,6 +783,22 @@ int main() {
         list_ports_adds_process_metadata();
 
         list_ports_keeps_listener_without_process_metadata();
+
+        list_ports_inspects_each_process_once();
+
+        list_ports_repeats_metadata_for_every_row_of_one_process();
+
+        inspect_port_inspects_each_process_once();
+
+        inspect_port_inspects_only_the_matching_process();
+
+        inspect_port_reports_plain_absence_when_the_scan_is_complete();
+
+        inspect_port_reports_limited_visibility_for_an_absent_listener();
+
+        kill_by_port_reports_limited_visibility_for_an_absent_listener();
+
+        kill_by_port_stops_a_visible_owner_despite_an_incomplete_scan();
 
         inspect_port_returns_not_found();
 

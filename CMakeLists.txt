@@ -40,6 +40,8 @@ add_library(
 
         src/use_cases/inspect_port.cpp
         src/use_cases/kill_process.cpp
+        src/use_cases/listener_enrichment.cpp
+        src/use_cases/listener_lookup.cpp
         src/use_cases/list_ports.cpp
 )
 

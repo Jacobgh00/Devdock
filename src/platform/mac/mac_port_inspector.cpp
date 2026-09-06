@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <arpa/inet.h>
 #include <array>
+#include <cerrno>
+#include <cstdint>
 #include <libproc.h>
 #include <optional>
 #include <sys/proc_info.h>
@@ -72,10 +74,59 @@ namespace devdock {
             return {};
         }
 
-        std::vector<proc_fdinfo>
+        enum class DescriptorScanOutcome : std::uint8_t {
+            // The descriptor table was read.
+            inspected,
+            // The process ended between enumeration and inspection. Expected
+            // during any scan and not a limit on visibility.
+            process_gone,
+            // The descriptor table could not be read, most often because the
+            // process belongs to another user.
+            not_inspectable,
+        };
+
+        DescriptorScanOutcome
+        classify_descriptor_scan_failure(
+            int error_number
+        ) {
+            if (error_number == ESRCH) {
+                return DescriptorScanOutcome::process_gone;
+            }
+
+            return DescriptorScanOutcome::not_inspectable;
+        }
+
+        struct DescriptorScan {
+            std::vector<proc_fdinfo>
+                descriptors;
+
+            DescriptorScanOutcome
+                outcome;
+        };
+
+        DescriptorScan
+        failed_descriptor_scan(
+            int error_number
+        ) {
+            return DescriptorScan{
+                .descriptors = {},
+                .outcome =
+                    classify_descriptor_scan_failure(
+                        error_number
+                    ),
+            };
+        }
+
+        // Reads one process's descriptor table. libproc reports the size and the
+        // contents in separate calls, so a process that opens descriptors in
+        // between can fill the buffer exactly; that is treated as a possibly
+        // truncated read and retried with more room.
+        DescriptorScan
         list_file_descriptors(
             pid_t pid
         ) {
+            errno = 0;
+
             const int required_bytes =
                 proc_pidinfo(
                     pid,
@@ -86,42 +137,69 @@ namespace devdock {
                 );
 
             if (required_bytes <= 0) {
-                return {};
+                return failed_descriptor_scan(errno);
             }
 
-            const auto capacity =
+            auto capacity =
                 (static_cast<std::size_t>(
                      required_bytes
                  ) /
                  sizeof(proc_fdinfo)) +
                 16;
 
-            std::vector<proc_fdinfo>
-                descriptors(capacity);
+            for (
+                int attempt = 0;
+                attempt < 3;
+                ++attempt) {
+                std::vector<proc_fdinfo>
+                    descriptors(capacity);
 
-            const int bytes =
-                proc_pidinfo(
-                    pid,
-                    PROC_PIDLISTFDS,
-                    0,
-                    descriptors.data(),
-                    static_cast<int>(
-                        descriptors.size() * sizeof(proc_fdinfo)
-                    )
-                );
+                errno = 0;
 
-            if (bytes <= 0) {
-                return {};
+                const int bytes =
+                    proc_pidinfo(
+                        pid,
+                        PROC_PIDLISTFDS,
+                        0,
+                        descriptors.data(),
+                        static_cast<int>(
+                            descriptors.size() * sizeof(proc_fdinfo)
+                        )
+                    );
+
+                if (bytes <= 0) {
+                    return failed_descriptor_scan(errno);
+                }
+
+                const auto count =
+                    static_cast<std::size_t>(
+                        bytes
+                    ) /
+                    sizeof(proc_fdinfo);
+
+                if (count == capacity) {
+                    capacity *= 2;
+                    continue;
+                }
+
+                descriptors.resize(count);
+
+                return DescriptorScan{
+                    .descriptors =
+                        std::move(descriptors),
+                    .outcome =
+                        DescriptorScanOutcome::inspected,
+                };
             }
 
-            descriptors.resize(
-                static_cast<std::size_t>(
-                    bytes
-                ) /
-                sizeof(proc_fdinfo)
-            );
-
-            return descriptors;
+            // A process that keeps opening descriptors can outrun the retries.
+            // That is counted with the processes this user may not inspect: the
+            // scan could not read it either way.
+            return DescriptorScan{
+                .descriptors = {},
+                .outcome =
+                    DescriptorScanOutcome::not_inspectable,
+            };
         }
 
         std::optional<socket_fdinfo>
@@ -281,16 +359,23 @@ namespace devdock {
             };
         }
 
-        void append_process_listeners(
+        DescriptorScanOutcome
+        append_process_listeners(
             pid_t pid,
             std::vector<ListeningPort>&
                 listeners
         ) {
-            const auto descriptors =
+            const auto scan =
                 list_file_descriptors(pid);
 
+            if (
+                scan.outcome != DescriptorScanOutcome::inspected
+            ) {
+                return scan.outcome;
+            }
+
             for (
-                const auto& descriptor : descriptors) {
+                const auto& descriptor : scan.descriptors) {
                 if (
                     descriptor.proc_fdtype != PROX_FDTYPE_SOCKET
                 ) {
@@ -319,6 +404,8 @@ namespace devdock {
                     );
                 }
             }
+
+            return scan.outcome;
         }
 
         void sort_and_deduplicate(
@@ -357,7 +444,7 @@ namespace devdock {
 
     } // namespace
 
-    Result<std::vector<ListeningPort>>
+    Result<PortScan>
     MacPortInspector::listening_ports() const {
         const auto pids =
             list_process_ids();
@@ -375,18 +462,31 @@ namespace devdock {
         std::vector<ListeningPort>
             listeners;
 
+        std::size_t uninspectable = 0;
+
         for (const auto pid : pids) {
-            append_process_listeners(
-                pid,
-                listeners
-            );
+            const auto outcome =
+                append_process_listeners(
+                    pid,
+                    listeners
+                );
+
+            if (
+                outcome == DescriptorScanOutcome::not_inspectable
+            ) {
+                ++uninspectable;
+            }
         }
 
         sort_and_deduplicate(
             listeners
         );
 
-        return listeners;
+        return PortScan{
+            .listeners = std::move(listeners),
+            .scanned_processes = pids.size(),
+            .uninspectable_processes = uninspectable,
+        };
     }
 
 } // namespace devdock
