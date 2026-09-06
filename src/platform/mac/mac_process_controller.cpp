@@ -59,6 +59,7 @@ namespace devdock {
             return {};
         }
 
+        // true when the process was already gone when the signal was sent.
         Result<bool> send_signal(
             ProcessId pid,
             TerminationMode mode
@@ -153,7 +154,7 @@ namespace devdock {
 
     } // namespace
 
-    Result<bool>
+    Result<StopOutcome>
     MacProcessController::stop(
         const ProcessIdentity& identity,
         TerminationMode mode,
@@ -199,13 +200,24 @@ namespace devdock {
         }
 
         if (*already_stopped) {
-            return true;
+            return StopOutcome::stopped;
         }
 
-        return wait_for_exit(
-            identity,
-            timeout
-        );
+        const auto stopped =
+            wait_for_exit(
+                identity,
+                timeout
+            );
+
+        if (!stopped) {
+            return std::unexpected(
+                stopped.error()
+            );
+        }
+
+        return *stopped
+                   ? StopOutcome::stopped
+                   : StopOutcome::still_running;
     }
 
 } // namespace devdock

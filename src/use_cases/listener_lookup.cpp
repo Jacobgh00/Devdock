@@ -67,7 +67,7 @@ namespace devdock {
             return std::unexpected(
                 Error{
                     .code = ErrorCode::ambiguous_target,
-                    .message = "Multiple processes are listening on port " + std::to_string(port) + "; use `devdock kill --pid <pid>` instead.",
+                    .message = "Multiple processes are listening on port " + std::to_string(port) + ".",
                 }
             );
         }

@@ -138,9 +138,9 @@ namespace {
         mutable std::vector<StopCall>
             calls;
 
-        bool stopped = true;
+        StopOutcome outcome = StopOutcome::stopped;
 
-        Result<bool> stop(
+        Result<StopOutcome> stop(
             const ProcessIdentity& identity,
             TerminationMode mode,
             std::chrono::milliseconds /*timeout*/
@@ -152,7 +152,7 @@ namespace {
                 }
             );
 
-            return stopped;
+            return outcome;
         }
     };
 
@@ -623,6 +623,11 @@ namespace {
 
         CHECK(
             result.error().code == ErrorCode::ambiguous_target
+        );
+
+        CHECK(
+            result.error().message ==
+            "Multiple processes are listening on port 5173."
         );
 
         CHECK(

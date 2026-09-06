@@ -333,7 +333,7 @@ namespace {
         CHECK(stopped.has_value());
 
         if (stopped) {
-            CHECK(*stopped);
+            CHECK(*stopped == StopOutcome::stopped);
         }
 
         /*

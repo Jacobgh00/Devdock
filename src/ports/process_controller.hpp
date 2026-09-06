@@ -12,6 +12,11 @@ namespace devdock {
         force,
     };
 
+    enum class StopOutcome : std::uint8_t {
+        stopped,
+        still_running,
+    };
+
     class ProcessController {
     public:
         virtual ~ProcessController() = default;
@@ -24,7 +29,7 @@ namespace devdock {
         ProcessController& operator=(ProcessController&&) = default;
 
     public:
-        [[nodiscard]] virtual Result<bool> stop(
+        [[nodiscard]] virtual Result<StopOutcome> stop(
             const ProcessIdentity& identity,
             TerminationMode mode,
             std::chrono::milliseconds timeout

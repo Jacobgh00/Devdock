@@ -174,6 +174,13 @@ namespace devdock {
                    error.message
                )
             << '\n';
+
+        if (
+            error.code == ErrorCode::ambiguous_target
+        ) {
+            output
+                << "Use `devdock kill --pid <pid>` to stop one of them.\n";
+        }
     }
 
     void print_ports(
@@ -250,7 +257,6 @@ namespace devdock {
         const auto name =
             sanitize_terminal_text(
                 result.process_name
-                    .value_or("process")
             );
 
         const bool forced =
@@ -274,15 +280,30 @@ namespace devdock {
         output << ".\n";
     }
 
-    void print_force_hint(
+    void print_stop_timeout(
         std::ostream& output,
         const KillResult& result
     ) {
         const auto name =
             sanitize_terminal_text(
                 result.process_name
-                    .value_or("process")
             );
+
+        if (
+            result.mode == TerminationMode::force
+        ) {
+            output
+                << name
+                << " (PID "
+                << result.pid
+                << ") did not exit after SIGKILL.\n"
+                << "The process is most likely blocked in the kernel; "
+                   "check its state with `ps -o stat= -p "
+                << result.pid
+                << "`.\n";
+
+            return;
+        }
 
         output
             << name

@@ -13,16 +13,11 @@
 
 namespace devdock {
 
-    enum class KillStatus : std::uint8_t {
-        stopped,
-        still_running,
-    };
-
     struct KillResult {
         ProcessId pid;
         std::optional<std::uint16_t> port;
-        std::optional<std::string> process_name;
-        KillStatus status;
+        std::string process_name;
+        StopOutcome outcome;
         TerminationMode mode;
     };
 

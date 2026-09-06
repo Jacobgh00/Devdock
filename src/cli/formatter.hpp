@@ -39,7 +39,9 @@ namespace devdock {
         const KillResult& result
     );
 
-    void print_force_hint(
+    // Reports a process that outlived the signal it was sent. Exhaustive over the
+    // termination mode: escalation is advised only after a graceful timeout.
+    void print_stop_timeout(
         std::ostream& output,
         const KillResult& result
     );

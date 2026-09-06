@@ -128,16 +128,16 @@ namespace devdock {
         std::optional<std::uint16_t> port,
         TerminationMode mode
     ) const {
-        auto stopped =
+        auto outcome =
             process_controller_.stop(
                 process.identity,
                 mode,
                 shutdown_timeout
             );
 
-        if (!stopped) {
+        if (!outcome) {
             return std::unexpected(
-                stopped.error()
+                outcome.error()
             );
         }
 
@@ -145,10 +145,7 @@ namespace devdock {
             .pid = process.identity.pid,
             .port = port,
             .process_name = process.name,
-            .status =
-                *stopped
-                    ? KillStatus::stopped
-                    : KillStatus::still_running,
+            .outcome = *outcome,
             .mode = mode,
         };
     }

@@ -47,6 +47,142 @@ namespace {
         );
     }
 
+    KillResult make_kill_result(
+        TerminationMode mode,
+        StopOutcome outcome,
+        std::optional<std::uint16_t> port
+    ) {
+        return KillResult{
+            .pid = 42,
+            .port = port,
+            .process_name = "node",
+            .outcome = outcome,
+            .mode = mode,
+        };
+    }
+
+    std::string timeout_report(
+        TerminationMode mode,
+        std::optional<std::uint16_t> port
+    ) {
+        std::ostringstream output;
+
+        print_stop_timeout(
+            output,
+            make_kill_result(
+                mode,
+                StopOutcome::still_running,
+                port
+            )
+        );
+
+        return output.str();
+    }
+
+    void graceful_timeout_advises_force_for_a_port() {
+        const auto report =
+            timeout_report(
+                TerminationMode::graceful,
+                5173
+            );
+
+        CHECK(
+            report ==
+            "node (PID 42) did not exit after SIGTERM.\n"
+            "Use `devdock kill 5173 --force` to send SIGKILL.\n"
+        );
+    }
+
+    void graceful_timeout_advises_force_for_a_pid() {
+        const auto report =
+            timeout_report(
+                TerminationMode::graceful,
+                std::nullopt
+            );
+
+        CHECK(
+            report ==
+            "node (PID 42) did not exit after SIGTERM.\n"
+            "Use `devdock kill --pid 42 --force` to send SIGKILL.\n"
+        );
+    }
+
+    void forced_timeout_reports_sigkill_and_advises_no_escalation() {
+        const auto report =
+            timeout_report(
+                TerminationMode::force,
+                5173
+            );
+
+        CHECK(
+            report ==
+            "node (PID 42) did not exit after SIGKILL.\n"
+            "The process is most likely blocked in the kernel; "
+            "check its state with `ps -o stat= -p 42`.\n"
+        );
+
+        CHECK(
+            !report.contains("--force")
+        );
+
+        CHECK(
+            !report.contains("SIGTERM")
+        );
+    }
+
+    void stopped_result_names_the_process() {
+        std::ostringstream output;
+
+        print_kill_result(
+            output,
+            make_kill_result(
+                TerminationMode::force,
+                StopOutcome::stopped,
+                5173
+            )
+        );
+
+        CHECK(
+            output.str() ==
+            "Force-stopped node (PID 42) listening on :5173.\n"
+        );
+    }
+
+    void ambiguous_target_error_advises_killing_by_pid() {
+        std::ostringstream output;
+
+        print_error(
+            output,
+            Error{
+                .code = ErrorCode::ambiguous_target,
+                .message = "Multiple processes are listening on port 5173.",
+            }
+        );
+
+        CHECK(
+            output.str() ==
+            "devdock: Multiple processes are listening on port 5173.\n"
+            "Use `devdock kill --pid <pid>` to stop one of them.\n"
+        );
+    }
+
+    void ordinary_error_carries_no_advice() {
+        std::ostringstream output;
+
+        print_error(
+            output,
+            Error{
+                .code = ErrorCode::not_found,
+                .message = "No process is listening on port 5173.",
+            }
+        );
+
+        CHECK(
+            output.str() ==
+            "devdock: No process is listening on port 5173.\n"
+        );
+    }
+
     void parses_ports() {
         const auto result =
             parse({"ports"});
@@ -181,6 +317,12 @@ int main() {
         parses_kill_by_pid();
         rejects_invalid_port();
         rejects_invalid_pid();
+        ambiguous_target_error_advises_killing_by_pid();
+        ordinary_error_carries_no_advice();
+        graceful_timeout_advises_force_for_a_port();
+        graceful_timeout_advises_force_for_a_pid();
+        forced_timeout_reports_sigkill_and_advises_no_escalation();
+        stopped_result_names_the_process();
         formats_command_arguments_without_losing_empty_strings();
         formats_ordinary_command_arguments();
         formats_unavailable_command_arguments();

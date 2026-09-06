@@ -108,9 +108,9 @@ namespace devdock {
             const KillResult& result
         ) {
             if (
-                result.status == KillStatus::still_running
+                result.outcome == StopOutcome::still_running
             ) {
-                print_force_hint(
+                print_stop_timeout(
                     std::cerr,
                     result
                 );
