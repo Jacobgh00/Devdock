@@ -88,14 +88,14 @@ namespace devdock {
 
             const auto port =
                 parse_port(
-                    arguments[1]
+                    arguments.at(1)
                 );
 
             if (!port) {
                 return std::unexpected(
                     ArgumentError{
                         "Invalid port: " + std::string{
-                                               arguments[1]
+                                               arguments.at(1)
                                            },
                     }
                 );
@@ -111,7 +111,7 @@ namespace devdock {
                 arguments
         ) {
             const bool force =
-                arguments.size() == 4 && arguments[3] == "--force";
+                arguments.size() == 4 && arguments.at(3) == "--force";
 
             if (
                 arguments.size() != 3 && !force
@@ -125,14 +125,14 @@ namespace devdock {
 
             const auto pid =
                 parse_pid(
-                    arguments[2]
+                    arguments.at(2)
                 );
 
             if (!pid) {
                 return std::unexpected(
                     ArgumentError{
                         "Invalid PID: " + std::string{
-                                              arguments[2]
+                                              arguments.at(2)
                                           },
                     }
                 );
@@ -149,7 +149,7 @@ namespace devdock {
                 arguments
         ) {
             const bool force =
-                arguments.size() == 3 && arguments[2] == "--force";
+                arguments.size() == 3 && arguments.at(2) == "--force";
 
             if (
                 arguments.size() != 2 && !force
@@ -163,14 +163,14 @@ namespace devdock {
 
             const auto port =
                 parse_port(
-                    arguments[1]
+                    arguments.at(1)
                 );
 
             if (!port) {
                 return std::unexpected(
                     ArgumentError{
                         "Invalid port: " + std::string{
-                                               arguments[1]
+                                               arguments.at(1)
                                            },
                     }
                 );
@@ -195,7 +195,7 @@ namespace devdock {
                 );
             }
 
-            if (arguments[1] == "--pid") {
+            if (arguments.at(1) == "--pid") {
                 return parse_kill_by_pid(
                     arguments
                 );

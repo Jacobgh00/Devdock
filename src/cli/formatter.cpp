@@ -208,7 +208,7 @@ namespace devdock {
 
             print_single_port_details(
                 output,
-                details[index]
+                details.at(index)
             );
         }
     }

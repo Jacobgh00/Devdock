@@ -3,6 +3,8 @@
 #include "platform/mac/mac_process_controller.hpp"
 #include "platform/mac/mac_process_inspector.hpp"
 
+#include <span>
+
 int main(
     int argc,
     char* argv[]
@@ -17,8 +19,10 @@ int main(
         process_controller;
 
     return devdock::run_cli(
-        argc,
-        argv,
+        std::span<char* const>{
+            argv,
+            static_cast<std::size_t>(argc)
+        },
         port_inspector,
         process_inspector,
         process_controller

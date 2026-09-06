@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -19,7 +20,11 @@ namespace {
 
     using namespace devdock;
 
-    int failures = 0;
+    int& failure_count() {
+        static int failures = 0;
+
+        return failures;
+    }
 
 #define CHECK(condition)             \
     do {                             \
@@ -31,7 +36,7 @@ namespace {
                 << " CHECK failed: " \
                 << #condition        \
                 << '\n';             \
-            ++failures;              \
+            ++failure_count();       \
         }                            \
     } while (false)
 
@@ -67,7 +72,7 @@ namespace {
 
             ++calls;
 
-            return snapshots[index];
+            return snapshots.at(index);
         }
     };
 
@@ -450,30 +455,39 @@ namespace {
 } // namespace
 
 int main() {
-    list_ports_adds_process_metadata();
+    try {
+        list_ports_adds_process_metadata();
 
-    list_ports_keeps_listener_without_process_metadata();
+        list_ports_keeps_listener_without_process_metadata();
 
-    inspect_port_returns_not_found();
+        inspect_port_returns_not_found();
 
-    kill_by_port_revalidates_owner();
+        kill_by_port_revalidates_owner();
 
-    kill_by_port_passes_process_identity();
+        kill_by_port_passes_process_identity();
 
-    kill_by_port_refuses_ambiguous_owner();
+        kill_by_port_refuses_ambiguous_owner();
 
-    kill_by_pid_preserves_force_mode();
+        kill_by_pid_preserves_force_mode();
 
-    if (failures != 0) {
+        if (failure_count() != 0) {
+            std::cerr
+                << failure_count()
+                << " test(s) failed\n";
+
+            return EXIT_FAILURE;
+        }
+
+        std::cout
+            << "All application tests passed\n";
+
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
         std::cerr
-            << failures
-            << " test(s) failed\n";
+            << "Unexpected exception: "
+            << error.what()
+            << '\n';
 
-        return EXIT_FAILURE;
+        return 1;
     }
-
-    std::cout
-        << "All application tests passed\n";
-
-    return EXIT_SUCCESS;
 }

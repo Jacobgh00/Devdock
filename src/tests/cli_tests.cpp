@@ -1,6 +1,7 @@
 #include "cli/arguments.hpp"
 
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <string_view>
 #include <variant>
@@ -10,7 +11,11 @@ namespace {
 
     using namespace devdock;
 
-    int failures = 0;
+    int& failure_count() {
+        static int failures = 0;
+
+        return failures;
+    }
 
 #define CHECK(condition)             \
     do {                             \
@@ -22,7 +27,7 @@ namespace {
                 << " CHECK failed: " \
                 << #condition        \
                 << '\n';             \
-            ++failures;              \
+            ++failure_count();       \
         }                            \
     } while (false)
 
@@ -129,24 +134,33 @@ namespace {
 } // namespace
 
 int main() {
-    parses_ports();
-    parses_inspect_port();
-    parses_graceful_kill();
-    parses_force_kill();
-    parses_kill_by_pid();
-    rejects_invalid_port();
-    rejects_invalid_pid();
+    try {
+        parses_ports();
+        parses_inspect_port();
+        parses_graceful_kill();
+        parses_force_kill();
+        parses_kill_by_pid();
+        rejects_invalid_port();
+        rejects_invalid_pid();
 
-    if (failures != 0) {
+        if (failure_count() != 0) {
+            std::cerr
+                << failure_count()
+                << " test(s) failed\n";
+
+            return EXIT_FAILURE;
+        }
+
+        std::cout
+            << "All CLI tests passed\n";
+
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
         std::cerr
-            << failures
-            << " test(s) failed\n";
+            << "Unexpected exception: "
+            << error.what()
+            << '\n';
 
-        return EXIT_FAILURE;
+        return 1;
     }
-
-    std::cout
-        << "All CLI tests passed\n";
-
-    return EXIT_SUCCESS;
 }

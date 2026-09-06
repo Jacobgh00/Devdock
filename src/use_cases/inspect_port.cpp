@@ -45,8 +45,8 @@ namespace devdock {
 
         if (matches.empty()) {
             return std::unexpected(Error{
-                ErrorCode::not_found,
-                "No process is listening on port " + std::to_string(port) + ".",
+                .code = ErrorCode::not_found,
+                .message = "No process is listening on port " + std::to_string(port) + ".",
             });
         }
 

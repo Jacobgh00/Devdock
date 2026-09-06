@@ -1,8 +1,7 @@
 #include "cli/terminal_text.hpp"
 
-#include <array>
 #include <cstdint>
-#include <cstdio>
+#include <format>
 
 namespace devdock {
 
@@ -19,31 +18,19 @@ namespace devdock {
         std::string hex_escape(
             unsigned char byte
         ) {
-            std::array<char, 5> buffer{};
-
-            std::snprintf(
-                buffer.data(),
-                buffer.size(),
-                "\\x%02X",
+            return std::format(
+                "\\x{:02X}",
                 byte
             );
-
-            return buffer.data();
         }
 
         std::string unicode_escape(
             std::uint32_t code_point
         ) {
-            std::array<char, 7> buffer{};
-
-            std::snprintf(
-                buffer.data(),
-                buffer.size(),
-                "\\u%04X",
+            return std::format(
+                "\\u{:04X}",
                 code_point
             );
-
-            return buffer.data();
         }
 
         bool is_control_code_point(
@@ -99,7 +86,7 @@ namespace devdock {
         ) {
             const auto first =
                 static_cast<unsigned char>(
-                    value[offset]
+                    value.at(offset)
                 );
 
             if (first < 0x80) {
@@ -152,7 +139,7 @@ namespace devdock {
                 ++index) {
                 const auto byte =
                     static_cast<unsigned char>(
-                        value[offset + index]
+                        value.at(offset + index)
                     );
 
                 if (
@@ -217,7 +204,7 @@ namespace devdock {
                 output +=
                     hex_escape(
                         static_cast<
-                            unsigned char>(value[offset])
+                            unsigned char>(value.at(offset))
                     );
 
                 ++offset;

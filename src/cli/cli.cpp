@@ -184,27 +184,25 @@ namespace devdock {
 
         std::vector<std::string_view>
         command_arguments(
-            int argc,
-            char* argv[]
+            std::span<char* const> arguments_in
         ) {
             std::vector<std::string_view>
                 arguments;
 
+            if (arguments_in.empty()) {
+                return arguments;
+            }
+
+            const auto without_program_name =
+                arguments_in.subspan(1);
+
             arguments.reserve(
-                argc > 1
-                    ? static_cast<std::size_t>(
-                          argc - 1
-                      )
-                    : 0
+                without_program_name.size()
             );
 
             for (
-                int index = 1;
-                index < argc;
-                ++index) {
-                arguments.emplace_back(
-                    argv[index]
-                );
+                char* const argument : without_program_name) {
+                arguments.emplace_back(argument);
             }
 
             return arguments;
@@ -213,8 +211,7 @@ namespace devdock {
     } // namespace
 
     int run_cli(
-        int argc,
-        char* argv[],
+        std::span<char* const> arguments,
         const PortInspector& port_inspector,
         const ProcessInspector& process_inspector,
         const ProcessController& process_controller
@@ -222,8 +219,7 @@ namespace devdock {
         const auto command =
             parse_arguments(
                 command_arguments(
-                    argc,
-                    argv
+                    arguments
                 )
             );
 

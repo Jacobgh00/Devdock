@@ -16,6 +16,14 @@ namespace devdock {
     public:
         virtual ~ProcessController() = default;
 
+    protected:
+        ProcessController() = default;
+        ProcessController(const ProcessController&) = default;
+        ProcessController(ProcessController&&) = default;
+        ProcessController& operator=(const ProcessController&) = default;
+        ProcessController& operator=(ProcessController&&) = default;
+
+    public:
         [[nodiscard]] virtual Result<bool> stop(
             const ProcessIdentity& identity,
             TerminationMode mode,

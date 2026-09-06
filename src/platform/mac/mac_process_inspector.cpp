@@ -96,14 +96,14 @@ namespace devdock {
             size_t limit_size =
                 sizeof(argument_limit);
 
-            int limit_mib[2] = {
+            std::array<int, 2> limit_mib = {
                 CTL_KERN,
                 KERN_ARGMAX,
             };
 
             if (
                 ::sysctl(
-                    limit_mib,
+                    limit_mib.data(),
                     2,
                     &argument_limit,
                     &limit_size,
@@ -124,7 +124,7 @@ namespace devdock {
             size_t size =
                 buffer.size();
 
-            int arguments_mib[3] = {
+            std::array<int, 3> arguments_mib = {
                 CTL_KERN,
                 KERN_PROCARGS2,
                 pid,
@@ -132,7 +132,7 @@ namespace devdock {
 
             if (
                 ::sysctl(
-                    arguments_mib,
+                    arguments_mib.data(),
                     3,
                     buffer.data(),
                     &size,

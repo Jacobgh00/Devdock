@@ -7,6 +7,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -17,7 +18,11 @@ namespace {
 
     using namespace devdock;
 
-    int failures = 0;
+    int& failure_count() {
+        static int failures = 0;
+
+        return failures;
+    }
 
 #define CHECK(condition)             \
     do {                             \
@@ -29,7 +34,7 @@ namespace {
                 << " CHECK failed: " \
                 << #condition        \
                 << '\n';             \
-            ++failures;              \
+            ++failure_count();       \
         }                            \
     } while (false)
 
@@ -162,6 +167,34 @@ namespace {
         ::close(socket_fd);
     }
 
+    void check_stop_rejects_stale_identity(
+        const ProcessIdentity& identity
+    ) {
+        auto stale_identity = identity;
+
+        ++stale_identity
+              .start_time_token;
+
+        MacProcessController controller;
+
+        const auto result =
+            controller.stop(
+                stale_identity,
+                TerminationMode::graceful,
+                std::chrono::milliseconds{
+                    100
+                }
+            );
+
+        CHECK(!result.has_value());
+
+        if (!result) {
+            CHECK(
+                result.error().code == ErrorCode::target_changed
+            );
+        }
+    }
+
     void controller_refuses_changed_identity() {
         if (::geteuid() == 0) {
             return;
@@ -192,30 +225,9 @@ namespace {
         CHECK(process.has_value());
 
         if (process) {
-            auto wrong_identity =
-                process->identity;
-
-            ++wrong_identity
-                  .start_time_token;
-
-            MacProcessController controller;
-
-            const auto result =
-                controller.stop(
-                    wrong_identity,
-                    TerminationMode::graceful,
-                    std::chrono::milliseconds{
-                        100
-                    }
-                );
-
-            CHECK(!result.has_value());
-
-            if (!result) {
-                CHECK(
-                    result.error().code == ErrorCode::target_changed
-                );
-            }
+            check_stop_rejects_stale_identity(
+                process->identity
+            );
         }
 
         /*
@@ -310,26 +322,35 @@ namespace {
 } // namespace
 
 int main() {
-    identity_reader_reads_current_process();
+    try {
+        identity_reader_reads_current_process();
 
-    process_inspector_reads_current_process();
+        process_inspector_reads_current_process();
 
-    port_inspector_finds_current_listener();
+        port_inspector_finds_current_listener();
 
-    controller_refuses_changed_identity();
+        controller_refuses_changed_identity();
 
-    controller_terminates_child();
+        controller_terminates_child();
 
-    if (failures != 0) {
+        if (failure_count() != 0) {
+            std::cerr
+                << failure_count()
+                << " test(s) failed\n";
+
+            return EXIT_FAILURE;
+        }
+
+        std::cout
+            << "All macOS platform tests passed\n";
+
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
         std::cerr
-            << failures
-            << " test(s) failed\n";
+            << "Unexpected exception: "
+            << error.what()
+            << '\n';
 
-        return EXIT_FAILURE;
+        return 1;
     }
-
-    std::cout
-        << "All macOS platform tests passed\n";
-
-    return EXIT_SUCCESS;
 }

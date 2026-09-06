@@ -1,6 +1,7 @@
 #include "cli/terminal_text.hpp"
 
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <string>
 
@@ -8,7 +9,11 @@ namespace {
 
     using devdock::sanitize_terminal_text;
 
-    int failures = 0;
+    int& failure_count() {
+        static int failures = 0;
+
+        return failures;
+    }
 
 #define CHECK(condition)             \
     do {                             \
@@ -20,7 +25,7 @@ namespace {
                 << " CHECK failed: " \
                 << #condition        \
                 << '\n';             \
-            ++failures;              \
+            ++failure_count();       \
         }                            \
     } while (false)
 
@@ -84,22 +89,31 @@ namespace {
 } // namespace
 
 int main() {
-    keeps_normal_utf8();
-    escapes_ascii_controls();
-    escapes_ansi_escape_sequences();
-    escapes_unicode_c1_controls();
-    escapes_invalid_utf8();
+    try {
+        keeps_normal_utf8();
+        escapes_ascii_controls();
+        escapes_ansi_escape_sequences();
+        escapes_unicode_c1_controls();
+        escapes_invalid_utf8();
 
-    if (failures != 0) {
+        if (failure_count() != 0) {
+            std::cerr
+                << failure_count()
+                << " test(s) failed\n";
+
+            return EXIT_FAILURE;
+        }
+
+        std::cout
+            << "All terminal text tests passed\n";
+
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
         std::cerr
-            << failures
-            << " test(s) failed\n";
+            << "Unexpected exception: "
+            << error.what()
+            << '\n';
 
-        return EXIT_FAILURE;
+        return 1;
     }
-
-    std::cout
-        << "All terminal text tests passed\n";
-
-    return EXIT_SUCCESS;
 }

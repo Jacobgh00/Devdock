@@ -1,13 +1,18 @@
 #include "platform/mac/mac_process_safety.hpp"
 
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 
 namespace {
 
     using namespace devdock;
 
-    int failures = 0;
+    int& failure_count() {
+        static int failures = 0;
+
+        return failures;
+    }
 
 #define CHECK(condition)             \
     do {                             \
@@ -19,7 +24,7 @@ namespace {
                 << " CHECK failed: " \
                 << #condition        \
                 << '\n';             \
-            ++failures;              \
+            ++failure_count();       \
         }                            \
     } while (false)
 
@@ -133,22 +138,31 @@ namespace {
 } // namespace
 
 int main() {
-    refuses_root();
-    refuses_pid_one();
-    refuses_self();
-    refuses_other_user();
-    accepts_current_users_process();
+    try {
+        refuses_root();
+        refuses_pid_one();
+        refuses_self();
+        refuses_other_user();
+        accepts_current_users_process();
 
-    if (failures != 0) {
+        if (failure_count() != 0) {
+            std::cerr
+                << failure_count()
+                << " test(s) failed\n";
+
+            return EXIT_FAILURE;
+        }
+
+        std::cout
+            << "All process safety tests passed\n";
+
+        return EXIT_SUCCESS;
+    } catch (const std::exception& error) {
         std::cerr
-            << failures
-            << " test(s) failed\n";
+            << "Unexpected exception: "
+            << error.what()
+            << '\n';
 
-        return EXIT_FAILURE;
+        return 1;
     }
-
-    std::cout
-        << "All process safety tests passed\n";
-
-    return EXIT_SUCCESS;
 }
