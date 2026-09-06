@@ -81,9 +81,8 @@ namespace {
             !process->name.empty()
         );
 
-        CHECK(
-            !process->command.empty()
-        );
+        const bool has_arguments = process->arguments && !process->arguments->empty();
+        CHECK(has_arguments);
     }
 
     void port_inspector_finds_current_listener() {

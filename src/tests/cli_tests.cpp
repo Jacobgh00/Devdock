@@ -1,8 +1,12 @@
 #include "cli/arguments.hpp"
+#include "cli/formatter.hpp"
 
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <optional>
+#include <sstream>
+#include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
@@ -131,6 +135,41 @@ namespace {
         CHECK(!result.has_value());
     }
 
+    std::string render_process_details(const std::optional<std::vector<std::string>>& arguments) {
+        const PortDetails details{
+            .listener = {.port = 5173, .protocol = Protocol::tcp, .address = "127.0.0.1", .pid = 42},
+            .process = Process{
+                .identity = {.pid = 42, .owner_user_id = 501, .start_time_token = 100},
+                .name = "node",
+                .arguments = arguments,
+                .working_directory = std::nullopt,
+            },
+        };
+        std::ostringstream output;
+        print_port_details(output, {details});
+        return output.str();
+    }
+
+    void formats_command_arguments_without_losing_empty_strings() {
+        const auto output = render_process_details(std::vector<std::string>{"node", "", "two words", "it's", "\"quoted\"", ""});
+        CHECK(output.contains("Command    node '' 'two words' 'it'\\''s' '\"quoted\"' ''\n"));
+    }
+
+    void formats_ordinary_command_arguments() {
+        const auto output = render_process_details(std::vector<std::string>{"node", "vite"});
+        CHECK(output.contains("Command    node vite\n"));
+    }
+
+    void formats_unavailable_command_arguments() {
+        const auto output = render_process_details(std::nullopt);
+        CHECK(output.contains("Command    <unavailable>\n"));
+    }
+
+    void escapes_terminal_controls_in_command_arguments() {
+        const auto output = render_process_details(std::vector<std::string>{"node", "bad\x1B[2J\n"});
+        CHECK(output.contains("Command    node bad\\x1B[2J\\n\n"));
+    }
+
 } // namespace
 
 int main() {
@@ -142,6 +181,10 @@ int main() {
         parses_kill_by_pid();
         rejects_invalid_port();
         rejects_invalid_pid();
+        formats_command_arguments_without_losing_empty_strings();
+        formats_ordinary_command_arguments();
+        formats_unavailable_command_arguments();
+        escapes_terminal_controls_in_command_arguments();
 
         if (failure_count() != 0) {
             std::cerr

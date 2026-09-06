@@ -1,5 +1,6 @@
 # The platform tests bind a real socket to verify the port inspector.
 # Casting sockaddr_in* to sockaddr* is how the BSD sockets API is called;
 # there is no alternative spelling that avoids reinterpret_cast.
+InheritParentConfig: true
 Checks: >
   -cppcoreguidelines-pro-type-reinterpret-cast

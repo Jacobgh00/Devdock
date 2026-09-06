@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace devdock {
 
@@ -47,13 +48,14 @@ namespace devdock {
         ) const;
 
     private:
-        [[nodiscard]] Result<ProcessId> find_unique_owner(
+        [[nodiscard]] static Result<ProcessId> find_unique_owner(
+            const std::vector<ListeningPort>& listeners,
             std::uint16_t port
-        ) const;
+        );
 
         [[nodiscard]] Result<void> confirm_owner(
             std::uint16_t port,
-            ProcessId pid
+            const ProcessIdentity& identity
         ) const;
 
         [[nodiscard]] Result<KillResult> stop_process(

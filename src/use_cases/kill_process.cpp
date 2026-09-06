@@ -15,8 +15,14 @@ namespace devdock {
         std::uint16_t port,
         TerminationMode mode
     ) const {
+        auto listeners = port_inspector_.listening_ports();
+
+        if (!listeners) {
+            return std::unexpected(listeners.error());
+        }
+
         auto owner =
-            find_unique_owner(port);
+            find_unique_owner(*listeners, port);
 
         if (!owner) {
             return std::unexpected(
@@ -38,7 +44,7 @@ namespace devdock {
         auto confirmation =
             confirm_owner(
                 port,
-                process->identity.pid
+                process->identity
             );
 
         if (!confirmation) {
@@ -85,20 +91,12 @@ namespace devdock {
 
     Result<ProcessId>
     KillProcess::find_unique_owner(
+        const std::vector<ListeningPort>& listeners,
         std::uint16_t port
-    ) const {
-        auto listeners =
-            port_inspector_.listening_ports();
-
-        if (!listeners) {
-            return std::unexpected(
-                listeners.error()
-            );
-        }
-
+    ) {
         std::set<ProcessId> owners;
 
-        for (const auto& listener : *listeners) {
+        for (const auto& listener : listeners) {
             if (listener.port == port) {
                 owners.insert(
                     listener.pid
@@ -129,7 +127,7 @@ namespace devdock {
 
     Result<void> KillProcess::confirm_owner(
         std::uint16_t port,
-        ProcessId pid
+        const ProcessIdentity& identity
     ) const {
         auto listeners =
             port_inspector_.listening_ports();
@@ -140,12 +138,14 @@ namespace devdock {
             );
         }
 
-        for (const auto& listener : *listeners) {
-            if (
-                listener.port == port && listener.pid == pid
-            ) {
-                return {};
-            }
+        const auto owner = find_unique_owner(*listeners, port);
+
+        if (!owner && owner.error().code != ErrorCode::not_found) {
+            return std::unexpected(owner.error());
+        }
+
+        if (owner && *owner == identity.pid) {
+            return {};
         }
 
         return std::unexpected(

@@ -31,9 +31,11 @@ Protocol   TCP
 Address    0.0.0.0
 PID        21563
 Process    node
-Command    'next-server (v16.3.3)' COMMAND_MODE=unix2003 SHELL=/bin/zsh
+Command    node server.js
 CWD        /Users/me/projects/my-app
 ```
+
+Command output preserves empty arguments as `''`. Unavailable or malformed argument data is shown as `<unavailable>`.
 
 `kill` sends `SIGTERM` and waits for the process to exit. `--force` sends `SIGKILL` instead.
 
@@ -101,7 +103,7 @@ cmake --build build
 cd build && ctest --output-on-failure
 ```
 
-Five suites: `application`, `cli`, `terminal_text`, `process_safety`, `platform`. The `platform` suite forks real child processes and signals them, so it touches the live system; it skips its destructive cases when running as root.
+CTest covers application logic, CLI parsing and formatting, terminal text, process safety, platform adapters, and argument decoding (including empty `argv[0]`). The `platform` suite forks real child processes and signals them, so it touches the live system; it skips its destructive cases when running as root.
 
 Pass `-DBUILD_TESTING=OFF` at configure time to skip building them.
 

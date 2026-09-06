@@ -48,12 +48,13 @@ namespace {
             snapshots;
 
         std::optional<Error> error;
+        std::size_t error_on_call = 0;
 
         mutable std::size_t calls = 0;
 
         Result<std::vector<ListeningPort>>
         listening_ports() const override {
-            if (error) {
+            if (error && calls >= error_on_call) {
                 return std::unexpected(
                     *error
                 );
@@ -147,7 +148,7 @@ namespace {
                         123456,
                 },
             .name = std::move(name),
-            .command = "node vite",
+            .arguments = std::vector<std::string>{"node", "vite"},
             .working_directory =
                 "/tmp/project",
         };
@@ -414,6 +415,114 @@ namespace {
         );
     }
 
+    void kill_by_port_refuses_owner_that_becomes_ambiguous() {
+        FakePortInspector ports;
+        ports.snapshots = {
+            {make_listener(5173, 42)},
+            {
+                make_listener(5173, 42),
+                ListeningPort{
+                    .port = 5173,
+                    .protocol = Protocol::tcp6,
+                    .address = "::1",
+                    .pid = 43,
+                },
+            },
+        };
+
+        FakeProcessInspector processes;
+        processes.processes.emplace(42, make_process(42));
+        FakeProcessController controller;
+
+        const auto result = KillProcess{ports, processes, controller}
+                                .by_port(5173, TerminationMode::graceful);
+
+        CHECK(!result.has_value());
+
+        if (!result) {
+            CHECK(result.error().code == ErrorCode::ambiguous_target);
+        }
+
+        CHECK(controller.calls.empty());
+    }
+
+    void kill_by_port_refuses_owner_that_disappears() {
+        FakePortInspector ports;
+        ports.snapshots = {{make_listener(5173, 42)}, {}};
+
+        FakeProcessInspector processes;
+        processes.processes.emplace(42, make_process(42));
+        FakeProcessController controller;
+
+        const auto result = KillProcess{ports, processes, controller}
+                                .by_port(5173, TerminationMode::graceful);
+
+        CHECK(!result.has_value());
+
+        if (!result) {
+            CHECK(result.error().code == ErrorCode::target_changed);
+        }
+
+        CHECK(controller.calls.empty());
+    }
+
+    void kill_by_port_accepts_multiple_listeners_for_one_owner() {
+        FakePortInspector ports;
+        const std::vector<ListeningPort> listeners = {
+            make_listener(5173, 42),
+            ListeningPort{
+                .port = 5173,
+                .protocol = Protocol::tcp6,
+                .address = "::1",
+                .pid = 42,
+            },
+            make_listener(6379, 99),
+        };
+        ports.snapshots = {listeners, listeners};
+
+        FakeProcessInspector processes;
+        const auto process = make_process(42);
+        processes.processes.emplace(42, process);
+        FakeProcessController controller;
+
+        const auto result = KillProcess{ports, processes, controller}
+                                .by_port(5173, TerminationMode::graceful);
+
+        CHECK(result.has_value());
+        CHECK(controller.calls.size() == 1);
+
+        if (controller.calls.size() == 1) {
+            CHECK(controller.calls.front().identity == process.identity);
+        }
+    }
+
+    void kill_by_port_preserves_scan_errors() {
+        for (const auto code : {ErrorCode::not_found, ErrorCode::permission_denied, ErrorCode::system_error}) {
+            for (const std::size_t error_on_call : {0U, 1U}) {
+                FakePortInspector ports;
+                ports.snapshots = {{make_listener(5173, 42)}};
+                ports.error = Error{.code = code, .message = "Listener scan failed."};
+                ports.error_on_call = error_on_call;
+
+                FakeProcessInspector processes;
+                processes.processes.emplace(42, make_process(42));
+                FakeProcessController controller;
+
+                const auto result = KillProcess{ports, processes, controller}
+                                        .by_port(5173, TerminationMode::graceful);
+
+                CHECK(!result.has_value());
+
+                if (!result) {
+                    CHECK(result.error().code == code);
+                    CHECK(result.error().message == "Listener scan failed.");
+                }
+
+                CHECK(controller.calls.empty());
+            }
+        }
+    }
+
     void kill_by_pid_preserves_force_mode() {
         FakePortInspector ports;
         FakeProcessInspector processes;
@@ -467,6 +576,14 @@ int main() {
         kill_by_port_passes_process_identity();
 
         kill_by_port_refuses_ambiguous_owner();
+
+        kill_by_port_refuses_owner_that_becomes_ambiguous();
+
+        kill_by_port_refuses_owner_that_disappears();
+
+        kill_by_port_accepts_multiple_listeners_for_one_owner();
+
+        kill_by_port_preserves_scan_errors();
 
         kill_by_pid_preserves_force_mode();
 

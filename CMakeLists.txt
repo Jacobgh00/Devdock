@@ -86,6 +86,7 @@ add_library(
         devdock_platform
 
         src/platform/mac/mac_port_inspector.cpp
+        src/platform/mac/mac_process_arguments.cpp
         src/platform/mac/mac_process_controller.cpp
         src/platform/mac/mac_process_identity.cpp
         src/platform/mac/mac_process_inspector.cpp
@@ -247,4 +248,11 @@ if(BUILD_TESTING)
             NAME platform
             COMMAND devdock_platform_tests
     )
+
+    add_executable(devdock_process_arguments_tests src/tests/process_arguments_tests.cpp)
+    target_link_libraries(devdock_process_arguments_tests PRIVATE devdock_platform)
+    devdock_enable_warnings(devdock_process_arguments_tests)
+    add_test(NAME process_arguments COMMAND devdock_process_arguments_tests "" tail "")
+    add_test(NAME process_arguments_empty_argv0 COMMAND devdock_process_arguments_tests --empty-argv0)
+    set_tests_properties(process_arguments process_arguments_empty_argv0 PROPERTIES TIMEOUT 10 ENVIRONMENT "DEVDOCK_ARGUMENT_TEST=synthetic_only")
 endif()

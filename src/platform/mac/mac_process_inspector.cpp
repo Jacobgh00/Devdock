@@ -1,16 +1,16 @@
 #include "platform/mac/mac_process_inspector.hpp"
 
+#include "platform/mac/mac_process_arguments.hpp"
 #include "platform/mac/mac_process_identity.hpp"
 
 #include <array>
-#include <cstring>
 #include <filesystem>
 #include <libproc.h>
 #include <optional>
 #include <string>
-#include <string_view>
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
+#include <utility>
 #include <vector>
 
 namespace devdock {
@@ -59,36 +59,8 @@ namespace devdock {
             return std::nullopt;
         }
 
-        std::string quote_argument(
-            std::string_view argument
-        ) {
-            if (
-                argument.find_first_of(
-                    " \t\"'"
-                ) == std::string_view::npos
-            ) {
-                return std::string{
-                    argument
-                };
-            }
-
-            std::string result{"'"};
-
-            for (const char character : argument) {
-                if (character == '\'') {
-                    result += "'\\''";
-                } else {
-                    result += character;
-                }
-            }
-
-            result += '\'';
-
-            return result;
-        }
-
         std::optional<std::vector<char>>
-        read_process_arguments(
+        read_argument_buffer(
             ProcessId pid
         ) {
             int argument_limit = 0;
@@ -149,112 +121,21 @@ namespace devdock {
             return buffer;
         }
 
-        std::optional<std::string>
-        command_from_arguments(
-            const std::vector<char>& buffer
-        ) {
-            if (
-                buffer.size() <= sizeof(int)
-            ) {
-                return std::nullopt;
-            }
-
-            int argc = 0;
-
-            std::memcpy(
-                &argc,
-                buffer.data(),
-                sizeof(argc)
-            );
-
-            if (argc <= 0) {
-                return std::nullopt;
-            }
-
-            const char* cursor =
-                buffer.data() + sizeof(argc);
-
-            const char* end =
-                buffer.data() + buffer.size();
-
-            /*
-             * KERN_PROCARGS2 places the executable path
-             * before argv[0].
-             */
-            while (
-                cursor < end && *cursor != '\0') {
-                ++cursor;
-            }
-
-            /*
-             * Skip null padding before argv[0].
-             */
-            while (
-                cursor < end && *cursor == '\0') {
-                ++cursor;
-            }
-
-            std::string command;
-
-            for (
-                int index = 0;
-                index < argc && cursor < end;
-                ++index) {
-                const char* argument_end =
-                    cursor;
-
-                while (
-                    argument_end < end && *argument_end != '\0') {
-                    ++argument_end;
-                }
-
-                if (argument_end == end) {
-                    break;
-                }
-
-                if (!command.empty()) {
-                    command += ' ';
-                }
-
-                command += quote_argument(
-                    std::string_view{
-                        cursor,
-                        static_cast<std::size_t>(
-                            argument_end - cursor
-                        ),
-                    }
-                );
-
-                cursor =
-                    argument_end + 1;
-
-                while (
-                    cursor < end && *cursor == '\0') {
-                    ++cursor;
-                }
-            }
-
-            if (command.empty()) {
-                return std::nullopt;
-            }
-
-            return command;
-        }
-
-        std::optional<std::string>
-        read_command(
+        std::optional<std::vector<std::string>>
+        read_process_arguments(
             ProcessId pid
         ) {
-            const auto arguments =
-                read_process_arguments(pid);
+            const auto buffer = read_argument_buffer(pid);
 
+            if (!buffer) {
+                return std::nullopt;
+            }
+
+            auto arguments = mac_detail::decode_process_arguments(*buffer);
             if (!arguments) {
                 return std::nullopt;
             }
-
-            return command_from_arguments(
-                *arguments
-            );
+            return std::move(*arguments);
         }
 
         std::optional<std::filesystem::path>
@@ -340,8 +221,7 @@ namespace devdock {
             );
         }
 
-        const auto command =
-            read_command(pid);
+        auto arguments = read_process_arguments(pid);
 
         const auto working_directory =
             read_working_directory(pid);
@@ -360,10 +240,7 @@ namespace devdock {
         return Process{
             .identity = *identity,
             .name = std::move(*name),
-            .command =
-                command.value_or(
-                    "<unavailable>"
-                ),
+            .arguments = std::move(arguments),
             .working_directory =
                 working_directory,
         };

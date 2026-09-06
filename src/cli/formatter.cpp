@@ -11,6 +11,38 @@ namespace devdock {
 
     namespace {
 
+        std::string quote_argument(std::string_view argument) {
+            if (!argument.empty() && argument.find_first_of(" \t\"'") == std::string_view::npos) {
+                return std::string{argument};
+            }
+
+            std::string quoted{"'"};
+            for (const char character : argument) {
+                if (character == '\'') {
+                    quoted += "'\\''";
+                } else {
+                    quoted += character;
+                }
+            }
+            quoted += '\'';
+            return quoted;
+        }
+
+        std::string command_line(const Process& process) {
+            if (!process.arguments) {
+                return "<unavailable>";
+            }
+
+            std::string command;
+            for (const auto& argument : *process.arguments) {
+                if (!command.empty()) {
+                    command += ' ';
+                }
+                command += quote_argument(argument);
+            }
+            return sanitize_terminal_text(command);
+        }
+
         std::string_view protocol_name(
             Protocol protocol
         ) {
@@ -90,9 +122,7 @@ namespace devdock {
                 << '\n'
 
                 << "Command    "
-                << sanitize_terminal_text(
-                       details.process->command
-                   )
+                << command_line(*details.process)
                 << '\n'
 
                 << "CWD        "
