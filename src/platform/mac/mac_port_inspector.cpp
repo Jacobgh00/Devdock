@@ -90,9 +90,10 @@ namespace devdock {
             }
 
             const auto capacity =
-                static_cast<std::size_t>(
-                    required_bytes
-                ) / sizeof(proc_fdinfo) +
+                (static_cast<std::size_t>(
+                     required_bytes
+                 ) /
+                 sizeof(proc_fdinfo)) +
                 16;
 
             std::vector<proc_fdinfo>
@@ -337,10 +338,9 @@ namespace devdock {
                 }
             );
 
-            const auto new_end =
-                std::unique(
-                    listeners.begin(),
-                    listeners.end(),
+            const auto duplicates =
+                std::ranges::unique(
+                    listeners,
                     [](
                         const ListeningPort& left,
                         const ListeningPort& right
@@ -350,8 +350,8 @@ namespace devdock {
                 );
 
             listeners.erase(
-                new_end,
-                listeners.end()
+                duplicates.begin(),
+                duplicates.end()
             );
         }
 

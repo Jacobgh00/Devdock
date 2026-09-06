@@ -79,7 +79,7 @@ namespace {
             Process>
             processes;
 
-        Result<Process> inspect(
+        [[nodiscard]] Result<Process> inspect(
             ProcessId pid
         ) const override {
             const auto found =
@@ -93,8 +93,8 @@ namespace {
 
             return std::unexpected(
                 Error{
-                    ErrorCode::not_found,
-                    "Process not found.",
+                    .code = ErrorCode::not_found,
+                    .message = "Process not found.",
                 }
             );
         }
@@ -116,7 +116,7 @@ namespace {
         Result<bool> stop(
             const ProcessIdentity& identity,
             TerminationMode mode,
-            std::chrono::milliseconds
+            std::chrono::milliseconds /*timeout*/
         ) const override {
             calls.push_back(
                 StopCall{
@@ -163,10 +163,14 @@ namespace {
     void list_ports_adds_process_metadata() {
         FakePortInspector ports;
 
-        ports.snapshots = {{make_listener(
-            5173,
-            42
-        )}};
+        ports.snapshots = {
+            {
+                make_listener(
+                    5173,
+                    42
+                ),
+            },
+        };
 
         FakeProcessInspector processes;
 
@@ -183,28 +187,38 @@ namespace {
                 .execute();
 
         CHECK(result.has_value());
-        CHECK(result->size() == 1);
 
-        CHECK(
-            result->front()
-                .process
-                .has_value()
-        );
+        const bool has_single_entry =
+            result && result->size() == 1;
 
-        CHECK(
+        CHECK(has_single_entry);
+
+        if (!has_single_entry) {
+            return;
+        }
+
+        const auto& process =
             result->front()
-                .process
-                ->name == "node"
-        );
+                .process;
+
+        CHECK(process.has_value());
+
+        if (process) {
+            CHECK(process->name == "node");
+        }
     }
 
     void list_ports_keeps_listener_without_process_metadata() {
         FakePortInspector ports;
 
-        ports.snapshots = {{make_listener(
-            6379,
-            99
-        )}};
+        ports.snapshots = {
+            {
+                make_listener(
+                    6379,
+                    99
+                ),
+            },
+        };
 
         FakeProcessInspector processes;
 
@@ -252,14 +266,18 @@ namespace {
         FakePortInspector ports;
 
         ports.snapshots = {
-            {make_listener(
-                5173,
-                42
-            )},
-            {make_listener(
-                5173,
-                43
-            )},
+            {
+                make_listener(
+                    5173,
+                    42
+                ),
+            },
+            {
+                make_listener(
+                    5173,
+                    43
+                ),
+            },
         };
 
         FakeProcessInspector processes;
@@ -297,14 +315,18 @@ namespace {
         FakePortInspector ports;
 
         ports.snapshots = {
-            {make_listener(
-                5173,
-                42
-            )},
-            {make_listener(
-                5173,
-                42
-            )},
+            {
+                make_listener(
+                    5173,
+                    42
+                ),
+            },
+            {
+                make_listener(
+                    5173,
+                    42
+                ),
+            },
         };
 
         FakeProcessInspector processes;
@@ -346,19 +368,21 @@ namespace {
     void kill_by_port_refuses_ambiguous_owner() {
         FakePortInspector ports;
 
-        ports.snapshots = {{
-            make_listener(
-                5173,
-                42
-            ),
-            ListeningPort{
-                .port = 5173,
-                .protocol =
-                    Protocol::tcp6,
-                .address = "::1",
-                .pid = 43,
+        ports.snapshots = {
+            {
+                make_listener(
+                    5173,
+                    42
+                ),
+                ListeningPort{
+                    .port = 5173,
+                    .protocol =
+                        Protocol::tcp6,
+                    .address = "::1",
+                    .pid = 43,
+                },
             },
-        }};
+        };
 
         FakeProcessInspector processes;
         FakeProcessController controller;

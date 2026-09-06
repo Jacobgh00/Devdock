@@ -7,7 +7,7 @@ namespace devdock {
     class MacProcessController final
         : public ProcessController {
     public:
-        Result<bool> stop(
+        [[nodiscard]] Result<bool> stop(
             const ProcessIdentity& identity,
             TerminationMode mode,
             std::chrono::milliseconds timeout

@@ -12,7 +12,7 @@
 
 namespace devdock {
 
-    enum class KillStatus {
+    enum class KillStatus : std::uint8_t {
         stopped,
         still_running,
     };
@@ -36,27 +36,27 @@ namespace devdock {
               process_inspector_{process_inspector},
               process_controller_{process_controller} {}
 
-        Result<KillResult> by_port(
+        [[nodiscard]] Result<KillResult> by_port(
             std::uint16_t port,
             TerminationMode mode
         ) const;
 
-        Result<KillResult> by_pid(
+        [[nodiscard]] Result<KillResult> by_pid(
             ProcessId pid,
             TerminationMode mode
         ) const;
 
     private:
-        Result<ProcessId> find_unique_owner(
+        [[nodiscard]] Result<ProcessId> find_unique_owner(
             std::uint16_t port
         ) const;
 
-        Result<void> confirm_owner(
+        [[nodiscard]] Result<void> confirm_owner(
             std::uint16_t port,
             ProcessId pid
         ) const;
 
-        Result<KillResult> stop_process(
+        [[nodiscard]] Result<KillResult> stop_process(
             const Process& process,
             std::optional<std::uint16_t> port,
             TerminationMode mode

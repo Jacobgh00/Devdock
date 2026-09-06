@@ -10,6 +10,15 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(DEVDOCK_ENABLE_CLANG_TIDY "Run clang-tidy as part of the build" OFF)
+
+if(DEVDOCK_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_COMMAND NAMES clang-tidy REQUIRED)
+    set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")
+endif()
+
 function(devdock_enable_warnings target)
     target_compile_options(
             ${target}

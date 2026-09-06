@@ -17,7 +17,7 @@ namespace devdock {
             : port_inspector_{port_inspector},
               process_inspector_{process_inspector} {}
 
-        Result<std::vector<PortDetails>>
+        [[nodiscard]] Result<std::vector<PortDetails>>
         execute() const;
 
     private:

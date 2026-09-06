@@ -81,7 +81,7 @@ namespace devdock {
             if (arguments.size() != 2) {
                 return std::unexpected(
                     ArgumentError{
-                        "Usage: devdock port <port>"
+                        "Usage: devdock port <port>",
                     }
                 );
             }
@@ -96,13 +96,13 @@ namespace devdock {
                     ArgumentError{
                         "Invalid port: " + std::string{
                                                arguments[1]
-                                           }
+                                           },
                     }
                 );
             }
 
             return InspectPortCommand{
-                *port
+                *port,
             };
         }
 
@@ -118,7 +118,7 @@ namespace devdock {
             ) {
                 return std::unexpected(
                     ArgumentError{
-                        "Usage: devdock kill --pid <pid> [--force]"
+                        "Usage: devdock kill --pid <pid> [--force]",
                     }
                 );
             }
@@ -133,14 +133,14 @@ namespace devdock {
                     ArgumentError{
                         "Invalid PID: " + std::string{
                                               arguments[2]
-                                          }
+                                          },
                     }
                 );
             }
 
             return KillPidCommand{
-                *pid,
-                termination_mode(force)
+                .pid = *pid,
+                .mode = termination_mode(force),
             };
         }
 
@@ -156,7 +156,7 @@ namespace devdock {
             ) {
                 return std::unexpected(
                     ArgumentError{
-                        "Usage: devdock kill <port> [--force]"
+                        "Usage: devdock kill <port> [--force]",
                     }
                 );
             }
@@ -171,14 +171,14 @@ namespace devdock {
                     ArgumentError{
                         "Invalid port: " + std::string{
                                                arguments[1]
-                                           }
+                                           },
                     }
                 );
             }
 
             return KillPortCommand{
-                *port,
-                termination_mode(force)
+                .port = *port,
+                .mode = termination_mode(force),
             };
         }
 
@@ -190,7 +190,7 @@ namespace devdock {
                 return std::unexpected(
                     ArgumentError{
                         "Usage: devdock kill <port> [--force] | "
-                        "devdock kill --pid <pid> [--force]"
+                        "devdock kill --pid <pid> [--force]",
                     }
                 );
             }
@@ -215,7 +215,7 @@ namespace devdock {
         if (arguments.empty()) {
             return std::unexpected(
                 ArgumentError{
-                    "No command provided."
+                    "No command provided.",
                 }
             );
         }
@@ -251,7 +251,7 @@ namespace devdock {
             ArgumentError{
                 "Unknown command: " + std::string{
                                           command
-                                      }
+                                      },
             }
         );
     }

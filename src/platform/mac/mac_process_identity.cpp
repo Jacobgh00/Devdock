@@ -77,7 +77,7 @@ namespace devdock::mac_detail {
                             info.pbi_uid
                         ),
                     .start_time_token =
-                        info.pbi_start_tvsec * microseconds_per_second + info.pbi_start_tvusec,
+                        (info.pbi_start_tvsec * microseconds_per_second) + info.pbi_start_tvusec,
                 },
             .zombie =
                 info.pbi_status == SZOMB,

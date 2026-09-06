@@ -116,12 +116,26 @@ Formatting is defined by `.clang-format` and applied by a script:
 
 Requires `clang-format` (`brew install llvm`). The script finds it on `PATH` or falls back to `/opt/homebrew/opt/llvm/bin`.
 
-`clang-tidy` is wired into the build but off by default:
+Linting uses `clang-tidy`, configured by `.clang-tidy`:
+
+```
+./lint.sh         # report findings for every source file
+./lint.sh --fix   # apply the automatic fixes
+```
+
+The script creates its own `build-tidy/` directory on first run. Arguments are passed
+through to `clang-tidy`. After `--fix`, run `./format.sh` — clang-tidy's edits do not
+follow `.clang-format`.
+
+clang-tidy can also run as part of a build, which reports findings inline with
+compilation:
 
 ```
 cmake -DDEVDOCK_ENABLE_CLANG_TIDY=ON -G Ninja -S . -B build-tidy
 cmake --build build-tidy
 ```
+
+It is off by default, so an ordinary build never depends on clang-tidy being installed.
 
 ## Layout
 

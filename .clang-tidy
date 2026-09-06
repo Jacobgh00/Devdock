@@ -11,7 +11,9 @@ Checks: >
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -modernize-use-trailing-return-type,
   -readability-identifier-length,
-  -readability-magic-numbers
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-do-while,
+  -portability-avoid-pragma-once
 
 WarningsAsErrors: ''
 HeaderFilterRegex: '.*/src/.*\.hpp$'

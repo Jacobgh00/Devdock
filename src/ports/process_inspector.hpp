@@ -8,7 +8,7 @@ namespace devdock {
     public:
         virtual ~ProcessInspector() = default;
 
-        virtual Result<Process> inspect(
+        [[nodiscard]] virtual Result<Process> inspect(
             ProcessId pid
         ) const = 0;
     };

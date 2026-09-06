@@ -5,7 +5,7 @@
 namespace devdock {
     class MacProcessInspector final : public ProcessInspector {
     public:
-        Result<Process> inspect(
+        [[nodiscard]] Result<Process> inspect(
             ProcessId pid
         ) const override;
     };

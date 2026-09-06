@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <expected>
 #include <string>
 
 namespace devdock {
-    enum class ErrorCode {
+    enum class ErrorCode : std::uint8_t {
         invalid_argument,
         not_found,
         permission_denied,

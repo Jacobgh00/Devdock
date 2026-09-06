@@ -10,6 +10,6 @@ namespace devdock {
     public:
         virtual ~PortInspector() = default;
 
-        virtual Result<std::vector<ListeningPort>> listening_ports() const = 0;
+        [[nodiscard]] virtual Result<std::vector<ListeningPort>> listening_ports() const = 0;
     };
 }

@@ -4,9 +4,10 @@
 #include "domain/process_identity.hpp"
 
 #include <chrono>
+#include <cstdint>
 
 namespace devdock {
-    enum class TerminationMode {
+    enum class TerminationMode : std::uint8_t {
         graceful,
         force,
     };
@@ -15,7 +16,7 @@ namespace devdock {
     public:
         virtual ~ProcessController() = default;
 
-        virtual Result<bool> stop(
+        [[nodiscard]] virtual Result<bool> stop(
             const ProcessIdentity& identity,
             TerminationMode mode,
             std::chrono::milliseconds timeout

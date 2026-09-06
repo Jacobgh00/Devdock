@@ -98,7 +98,7 @@ namespace devdock {
 
             int limit_mib[2] = {
                 CTL_KERN,
-                KERN_ARGMAX
+                KERN_ARGMAX,
             };
 
             if (
@@ -127,7 +127,7 @@ namespace devdock {
             int arguments_mib[3] = {
                 CTL_KERN,
                 KERN_PROCARGS2,
-                pid
+                pid,
             };
 
             if (

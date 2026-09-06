@@ -12,7 +12,7 @@ namespace devdock {
             unsigned char byte
         ) {
             return (
-                       byte & 0xC0
+                       byte & 0xC0U
                    ) == 0x80;
         }
 
@@ -105,7 +105,7 @@ namespace devdock {
             if (first < 0x80) {
                 return {
                     .value = first,
-                    .byte_count = 1
+                    .byte_count = 1,
                 };
             }
 
@@ -113,27 +113,27 @@ namespace devdock {
             std::uint32_t code_point = 0;
 
             if (
-                (first & 0xE0) == 0xC0
+                (first & 0xE0U) == 0xC0
             ) {
                 byte_count = 2;
                 code_point =
-                    first & 0x1F;
+                    first & 0x1FU;
             } else if (
-                (first & 0xF0) == 0xE0
+                (first & 0xF0U) == 0xE0
             ) {
                 byte_count = 3;
                 code_point =
-                    first & 0x0F;
+                    first & 0x0FU;
             } else if (
-                (first & 0xF8) == 0xF0
+                (first & 0xF8U) == 0xF0
             ) {
                 byte_count = 4;
                 code_point =
-                    first & 0x07;
+                    first & 0x07U;
             } else {
                 return {
                     .value = first,
-                    .byte_count = 0
+                    .byte_count = 0,
                 };
             }
 
@@ -142,7 +142,7 @@ namespace devdock {
             ) {
                 return {
                     .value = first,
-                    .byte_count = 0
+                    .byte_count = 0,
                 };
             }
 
@@ -161,13 +161,13 @@ namespace devdock {
                     )
                 ) {
                     return {
-                        first,
-                        0
+                        .value = first,
+                        .byte_count = 0,
                     };
                 }
 
                 code_point =
-                    (code_point << 6) | (byte & 0x3F);
+                    (code_point << 6U) | (byte & 0x3FU);
             }
 
             const bool overlong =
@@ -181,13 +181,13 @@ namespace devdock {
             ) {
                 return {
                     .value = first,
-                    .byte_count = 0
+                    .byte_count = 0,
                 };
             }
 
             return {
                 .value = code_point,
-                .byte_count = byte_count
+                .byte_count = byte_count,
             };
         }
 
