@@ -1,3 +1,5 @@
+#include "tests/test_support.hpp"
+
 #include "platform/mac/mac_process_safety.hpp"
 
 #include <cstdlib>
@@ -7,26 +9,7 @@
 namespace {
 
     using namespace devdock;
-
-    int& failure_count() {
-        static int failures = 0;
-
-        return failures;
-    }
-
-#define CHECK(condition)             \
-    do {                             \
-        if (!(condition)) {          \
-            std::cerr                \
-                << __FILE__          \
-                << ':'               \
-                << __LINE__          \
-                << " CHECK failed: " \
-                << #condition        \
-                << '\n';             \
-            ++failure_count();       \
-        }                            \
-    } while (false)
+    using namespace devdock::test_support;
 
     ProcessIdentity target(
         ProcessId pid,
@@ -138,31 +121,14 @@ namespace {
 } // namespace
 
 int main() {
-    try {
-        refuses_root();
-        refuses_pid_one();
-        refuses_self();
-        refuses_other_user();
-        accepts_current_users_process();
-
-        if (failure_count() != 0) {
-            std::cerr
-                << failure_count()
-                << " test(s) failed\n";
-
-            return EXIT_FAILURE;
+    return run_suite(
+        "process safety",
+        {
+            refuses_root,
+            refuses_pid_one,
+            refuses_self,
+            refuses_other_user,
+            accepts_current_users_process,
         }
-
-        std::cout
-            << "All process safety tests passed\n";
-
-        return EXIT_SUCCESS;
-    } catch (const std::exception& error) {
-        std::cerr
-            << "Unexpected exception: "
-            << error.what()
-            << '\n';
-
-        return 1;
-    }
+    );
 }

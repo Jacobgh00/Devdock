@@ -1,3 +1,5 @@
+#include "tests/test_support.hpp"
+
 #include "cli/arguments.hpp"
 #include "cli/formatter.hpp"
 
@@ -14,26 +16,7 @@
 namespace {
 
     using namespace devdock;
-
-    int& failure_count() {
-        static int failures = 0;
-
-        return failures;
-    }
-
-#define CHECK(condition)             \
-    do {                             \
-        if (!(condition)) {          \
-            std::cerr                \
-                << __FILE__          \
-                << ':'               \
-                << __LINE__          \
-                << " CHECK failed: " \
-                << #condition        \
-                << '\n';             \
-            ++failure_count();       \
-        }                            \
-    } while (false)
+    using namespace devdock::test_support;
 
     ParsedArguments parse(
         std::initializer_list<
@@ -205,7 +188,7 @@ namespace {
             std::get_if<
                 InspectPortCommand>(&*result);
 
-        CHECK(command != nullptr);
+        REQUIRE(command != nullptr);
         CHECK(command->port == 5173);
     }
 
@@ -219,7 +202,7 @@ namespace {
             std::get_if<
                 KillPortCommand>(&*result);
 
-        CHECK(command != nullptr);
+        REQUIRE(command != nullptr);
 
         CHECK(
             command->mode == TerminationMode::graceful
@@ -236,7 +219,7 @@ namespace {
             std::get_if<
                 KillPortCommand>(&*result);
 
-        CHECK(command != nullptr);
+        REQUIRE(command != nullptr);
 
         CHECK(
             command->mode == TerminationMode::force
@@ -253,7 +236,7 @@ namespace {
             std::get_if<
                 KillPidCommand>(&*result);
 
-        CHECK(command != nullptr);
+        REQUIRE(command != nullptr);
         CHECK(command->pid == 42);
     }
 
@@ -309,43 +292,26 @@ namespace {
 } // namespace
 
 int main() {
-    try {
-        parses_ports();
-        parses_inspect_port();
-        parses_graceful_kill();
-        parses_force_kill();
-        parses_kill_by_pid();
-        rejects_invalid_port();
-        rejects_invalid_pid();
-        ambiguous_target_error_advises_killing_by_pid();
-        ordinary_error_carries_no_advice();
-        graceful_timeout_advises_force_for_a_port();
-        graceful_timeout_advises_force_for_a_pid();
-        forced_timeout_reports_sigkill_and_advises_no_escalation();
-        stopped_result_names_the_process();
-        formats_command_arguments_without_losing_empty_strings();
-        formats_ordinary_command_arguments();
-        formats_unavailable_command_arguments();
-        escapes_terminal_controls_in_command_arguments();
-
-        if (failure_count() != 0) {
-            std::cerr
-                << failure_count()
-                << " test(s) failed\n";
-
-            return EXIT_FAILURE;
+    return run_suite(
+        "CLI",
+        {
+            parses_ports,
+            parses_inspect_port,
+            parses_graceful_kill,
+            parses_force_kill,
+            parses_kill_by_pid,
+            rejects_invalid_port,
+            rejects_invalid_pid,
+            ambiguous_target_error_advises_killing_by_pid,
+            ordinary_error_carries_no_advice,
+            graceful_timeout_advises_force_for_a_port,
+            graceful_timeout_advises_force_for_a_pid,
+            forced_timeout_reports_sigkill_and_advises_no_escalation,
+            stopped_result_names_the_process,
+            formats_command_arguments_without_losing_empty_strings,
+            formats_ordinary_command_arguments,
+            formats_unavailable_command_arguments,
+            escapes_terminal_controls_in_command_arguments,
         }
-
-        std::cout
-            << "All CLI tests passed\n";
-
-        return EXIT_SUCCESS;
-    } catch (const std::exception& error) {
-        std::cerr
-            << "Unexpected exception: "
-            << error.what()
-            << '\n';
-
-        return 1;
-    }
+    );
 }

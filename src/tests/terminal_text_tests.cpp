@@ -1,3 +1,5 @@
+#include "tests/test_support.hpp"
+
 #include "cli/terminal_text.hpp"
 
 #include <cstdlib>
@@ -8,26 +10,6 @@
 namespace {
 
     using devdock::sanitize_terminal_text;
-
-    int& failure_count() {
-        static int failures = 0;
-
-        return failures;
-    }
-
-#define CHECK(condition)             \
-    do {                             \
-        if (!(condition)) {          \
-            std::cerr                \
-                << __FILE__          \
-                << ':'               \
-                << __LINE__          \
-                << " CHECK failed: " \
-                << #condition        \
-                << '\n';             \
-            ++failure_count();       \
-        }                            \
-    } while (false)
 
     void keeps_normal_utf8() {
         CHECK(
@@ -89,31 +71,14 @@ namespace {
 } // namespace
 
 int main() {
-    try {
-        keeps_normal_utf8();
-        escapes_ascii_controls();
-        escapes_ansi_escape_sequences();
-        escapes_unicode_c1_controls();
-        escapes_invalid_utf8();
-
-        if (failure_count() != 0) {
-            std::cerr
-                << failure_count()
-                << " test(s) failed\n";
-
-            return EXIT_FAILURE;
+    return devdock::test_support::run_suite(
+        "terminal text",
+        {
+            keeps_normal_utf8,
+            escapes_ascii_controls,
+            escapes_ansi_escape_sequences,
+            escapes_unicode_c1_controls,
+            escapes_invalid_utf8,
         }
-
-        std::cout
-            << "All terminal text tests passed\n";
-
-        return EXIT_SUCCESS;
-    } catch (const std::exception& error) {
-        std::cerr
-            << "Unexpected exception: "
-            << error.what()
-            << '\n';
-
-        return 1;
-    }
+    );
 }

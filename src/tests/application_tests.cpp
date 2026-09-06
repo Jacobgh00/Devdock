@@ -1,3 +1,5 @@
+#include "tests/test_support.hpp"
+
 #include "domain/port_scan.hpp"
 #include "ports/port_inspector.hpp"
 #include "ports/process_controller.hpp"
@@ -20,26 +22,7 @@
 namespace {
 
     using namespace devdock;
-
-    int& failure_count() {
-        static int failures = 0;
-
-        return failures;
-    }
-
-#define CHECK(condition)             \
-    do {                             \
-        if (!(condition)) {          \
-            std::cerr                \
-                << __FILE__          \
-                << ':'               \
-                << __LINE__          \
-                << " CHECK failed: " \
-                << #condition        \
-                << '\n';             \
-            ++failure_count();       \
-        }                            \
-    } while (false)
+    using namespace devdock::test_support;
 
     class FakePortInspector final
         : public PortInspector {
@@ -784,63 +767,28 @@ namespace {
 } // namespace
 
 int main() {
-    try {
-        list_ports_adds_process_metadata();
-
-        list_ports_keeps_listener_without_process_metadata();
-
-        list_ports_inspects_each_process_once();
-
-        list_ports_repeats_metadata_for_every_row_of_one_process();
-
-        inspect_port_inspects_each_process_once();
-
-        inspect_port_inspects_only_the_matching_process();
-
-        inspect_port_reports_plain_absence_when_the_scan_is_complete();
-
-        inspect_port_reports_limited_visibility_for_an_absent_listener();
-
-        kill_by_port_reports_limited_visibility_for_an_absent_listener();
-
-        kill_by_port_stops_a_visible_owner_despite_an_incomplete_scan();
-
-        inspect_port_returns_not_found();
-
-        kill_by_port_revalidates_owner();
-
-        kill_by_port_passes_process_identity();
-
-        kill_by_port_refuses_ambiguous_owner();
-
-        kill_by_port_refuses_owner_that_becomes_ambiguous();
-
-        kill_by_port_refuses_owner_that_disappears();
-
-        kill_by_port_accepts_multiple_listeners_for_one_owner();
-
-        kill_by_port_preserves_scan_errors();
-
-        kill_by_pid_preserves_force_mode();
-
-        if (failure_count() != 0) {
-            std::cerr
-                << failure_count()
-                << " test(s) failed\n";
-
-            return EXIT_FAILURE;
+    return run_suite(
+        "application",
+        {
+            list_ports_adds_process_metadata,
+            list_ports_keeps_listener_without_process_metadata,
+            list_ports_inspects_each_process_once,
+            list_ports_repeats_metadata_for_every_row_of_one_process,
+            inspect_port_inspects_each_process_once,
+            inspect_port_inspects_only_the_matching_process,
+            inspect_port_reports_plain_absence_when_the_scan_is_complete,
+            inspect_port_reports_limited_visibility_for_an_absent_listener,
+            kill_by_port_reports_limited_visibility_for_an_absent_listener,
+            kill_by_port_stops_a_visible_owner_despite_an_incomplete_scan,
+            inspect_port_returns_not_found,
+            kill_by_port_revalidates_owner,
+            kill_by_port_passes_process_identity,
+            kill_by_port_refuses_ambiguous_owner,
+            kill_by_port_refuses_owner_that_becomes_ambiguous,
+            kill_by_port_refuses_owner_that_disappears,
+            kill_by_port_accepts_multiple_listeners_for_one_owner,
+            kill_by_port_preserves_scan_errors,
+            kill_by_pid_preserves_force_mode,
         }
-
-        std::cout
-            << "All application tests passed\n";
-
-        return EXIT_SUCCESS;
-    } catch (const std::exception& error) {
-        std::cerr
-            << "Unexpected exception: "
-            << error.what()
-            << '\n';
-
-        return 1;
-    }
+    );
 }

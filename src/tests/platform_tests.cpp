@@ -1,3 +1,7 @@
+#include "tests/test_support.hpp"
+
+#include "tests/owned_resources.hpp"
+
 #include "platform/mac/mac_port_inspector.hpp"
 #include "platform/mac/mac_process_controller.hpp"
 #include "platform/mac/mac_process_identity.hpp"
@@ -8,6 +12,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <exception>
+#include <fcntl.h>
 #include <iostream>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -17,26 +22,69 @@
 namespace {
 
     using namespace devdock;
+    using namespace devdock::test_support;
 
-    int& failure_count() {
-        static int failures = 0;
+    // Forks a child that waits until it is signalled.
+    pid_t fork_waiting_child() {
+        const pid_t child = ::fork();
 
-        return failures;
+        if (child == 0) {
+            for (;;) {
+                ::pause();
+            }
+        }
+
+        return child;
     }
 
-#define CHECK(condition)             \
-    do {                             \
-        if (!(condition)) {          \
-            std::cerr                \
-                << __FILE__          \
-                << ':'               \
-                << __LINE__          \
-                << " CHECK failed: " \
-                << #condition        \
-                << '\n';             \
-            ++failure_count();       \
-        }                            \
-    } while (false)
+    void an_owned_child_is_stopped_and_reaped_on_scope_exit() {
+        if (::geteuid() == 0) {
+            std::cout
+                << "Skipping destructive child ownership test as root\n";
+
+            return;
+        }
+
+        pid_t pid = 0;
+
+        {
+            OwnedChild child{fork_waiting_child()};
+
+            REQUIRE(child.pid() > 0);
+
+            pid = child.pid();
+        }
+
+        errno = 0;
+
+        CHECK(
+            ::waitpid(pid, nullptr, WNOHANG) == -1
+        );
+
+        CHECK(errno == ECHILD);
+    }
+
+    void an_owned_descriptor_is_closed_on_scope_exit() {
+        int raw = -1;
+
+        {
+            OwnedDescriptor descriptor{
+                ::socket(AF_INET, SOCK_STREAM, 0)
+            };
+
+            REQUIRE(descriptor.get() >= 0);
+
+            raw = descriptor.get();
+        }
+
+        errno = 0;
+
+        // dup rather than fcntl: it reports a closed descriptor the same way
+        // without a vararg call.
+        CHECK(::dup(raw) == -1);
+
+        CHECK(errno == EBADF);
+    }
 
     void identity_reader_reads_current_process() {
         const auto identity =
@@ -86,14 +134,15 @@ namespace {
     }
 
     void port_inspector_finds_current_listener() {
-        const int socket_fd =
+        const OwnedDescriptor socket_fd{
             ::socket(
                 AF_INET,
                 SOCK_STREAM,
                 0
-            );
+            )
+        };
 
-        CHECK(socket_fd >= 0);
+        REQUIRE(socket_fd.get() >= 0);
 
         sockaddr_in address{};
 
@@ -109,7 +158,7 @@ namespace {
 
         CHECK(
             ::bind(
-                socket_fd,
+                socket_fd.get(),
                 reinterpret_cast<
                     sockaddr*>(&address),
                 sizeof(address)
@@ -118,7 +167,7 @@ namespace {
 
         CHECK(
             ::listen(
-                socket_fd,
+                socket_fd.get(),
                 1
             ) == 0
         );
@@ -128,7 +177,7 @@ namespace {
 
         CHECK(
             ::getsockname(
-                socket_fd,
+                socket_fd.get(),
                 reinterpret_cast<
                     sockaddr*>(&address),
                 &length
@@ -145,14 +194,7 @@ namespace {
         const auto scan =
             inspector.listening_ports();
 
-        CHECK(
-            scan.has_value()
-        );
-
-        if (!scan) {
-            ::close(socket_fd);
-            return;
-        }
+        REQUIRE(scan.has_value());
 
         bool found = false;
 
@@ -167,8 +209,6 @@ namespace {
         }
 
         CHECK(found);
-
-        ::close(socket_fd);
     }
 
     void port_inspector_reports_scan_coverage() {
@@ -282,44 +322,18 @@ namespace {
             return;
         }
 
-        const pid_t child =
-            ::fork();
+        OwnedChild child{fork_waiting_child()};
 
-        CHECK(child >= 0);
-
-        if (child < 0) {
-            return;
-        }
-
-        if (child == 0) {
-            for (;;) {
-                ::pause();
-            }
-        }
+        REQUIRE(child.pid() > 0);
 
         MacProcessInspector inspector;
 
         const auto process =
             inspector.inspect(
-                child
+                child.pid()
             );
 
-        CHECK(process.has_value());
-
-        if (!process) {
-            ::kill(
-                child,
-                SIGKILL
-            );
-
-            ::waitpid(
-                child,
-                nullptr,
-                0
-            );
-
-            return;
-        }
+        REQUIRE(process.has_value());
 
         MacProcessController controller;
 
@@ -330,57 +344,31 @@ namespace {
                 std::chrono::seconds{1}
             );
 
-        CHECK(stopped.has_value());
+        REQUIRE(stopped.has_value());
 
-        if (stopped) {
-            CHECK(*stopped == StopOutcome::stopped);
-        }
+        CHECK(*stopped == StopOutcome::stopped);
 
         /*
          * The controller recognizes SZOMB as stopped.
-         * Reap the child afterwards.
+         * OwnedChild reaps the zombie, and stops and reaps
+         * the child on every failure path above.
          */
-        ::waitpid(
-            child,
-            nullptr,
-            0
-        );
     }
 
 } // namespace
 
 int main() {
-    try {
-        identity_reader_reads_current_process();
-
-        process_inspector_reads_current_process();
-
-        port_inspector_finds_current_listener();
-
-        port_inspector_reports_scan_coverage();
-
-        controller_refuses_changed_identity();
-
-        controller_terminates_child();
-
-        if (failure_count() != 0) {
-            std::cerr
-                << failure_count()
-                << " test(s) failed\n";
-
-            return EXIT_FAILURE;
+    return run_suite(
+        "macOS platform",
+        {
+            an_owned_child_is_stopped_and_reaped_on_scope_exit,
+            an_owned_descriptor_is_closed_on_scope_exit,
+            identity_reader_reads_current_process,
+            process_inspector_reads_current_process,
+            port_inspector_finds_current_listener,
+            port_inspector_reports_scan_coverage,
+            controller_refuses_changed_identity,
+            controller_terminates_child,
         }
-
-        std::cout
-            << "All macOS platform tests passed\n";
-
-        return EXIT_SUCCESS;
-    } catch (const std::exception& error) {
-        std::cerr
-            << "Unexpected exception: "
-            << error.what()
-            << '\n';
-
-        return 1;
-    }
+    );
 }

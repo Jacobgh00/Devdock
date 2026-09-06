@@ -147,9 +147,36 @@ include(CTest)
 
 if(BUILD_TESTING)
     add_executable(
+            devdock_test_support_tests
+
+            src/tests/test_support_tests.cpp
+    )
+
+    target_include_directories(
+            devdock_test_support_tests
+            PRIVATE
+            src
+    )
+
+    devdock_enable_warnings(
+            devdock_test_support_tests
+    )
+
+    add_test(
+            NAME test_support
+            COMMAND devdock_test_support_tests
+    )
+
+    add_executable(
             devdock_application_tests
 
             src/tests/application_tests.cpp
+    )
+
+    target_include_directories(
+            devdock_application_tests
+            PRIVATE
+            src
     )
 
     target_link_libraries(
@@ -173,6 +200,12 @@ if(BUILD_TESTING)
             src/tests/cli_tests.cpp
     )
 
+    target_include_directories(
+            devdock_cli_tests
+            PRIVATE
+            src
+    )
+
     target_link_libraries(
             devdock_cli_tests
             PRIVATE
@@ -192,6 +225,12 @@ if(BUILD_TESTING)
             devdock_terminal_text_tests
 
             src/tests/terminal_text_tests.cpp
+    )
+
+    target_include_directories(
+            devdock_terminal_text_tests
+            PRIVATE
+            src
     )
 
     target_link_libraries(
@@ -215,6 +254,12 @@ if(BUILD_TESTING)
             src/tests/process_safety_tests.cpp
     )
 
+    target_include_directories(
+            devdock_process_safety_tests
+            PRIVATE
+            src
+    )
+
     target_link_libraries(
             devdock_process_safety_tests
             PRIVATE
@@ -234,6 +279,12 @@ if(BUILD_TESTING)
             devdock_platform_tests
 
             src/tests/platform_tests.cpp
+    )
+
+    target_include_directories(
+            devdock_platform_tests
+            PRIVATE
+            src
     )
 
     target_link_libraries(
@@ -256,5 +307,21 @@ if(BUILD_TESTING)
     devdock_enable_warnings(devdock_process_arguments_tests)
     add_test(NAME process_arguments COMMAND devdock_process_arguments_tests "" tail "")
     add_test(NAME process_arguments_empty_argv0 COMMAND devdock_process_arguments_tests --empty-argv0)
-    set_tests_properties(process_arguments process_arguments_empty_argv0 PROPERTIES TIMEOUT 10 ENVIRONMENT "DEVDOCK_ARGUMENT_TEST=synthetic_only")
+    set_tests_properties(process_arguments process_arguments_empty_argv0 PROPERTIES ENVIRONMENT "DEVDOCK_ARGUMENT_TEST=synthetic_only")
+
+    #
+    # A last-resort guard only. Tests own their child processes and descriptors,
+    # so cleanup does not depend on this timeout.
+    #
+    set_tests_properties(
+            test_support
+            application
+            cli
+            terminal_text
+            process_safety
+            platform
+            process_arguments
+            process_arguments_empty_argv0
+            PROPERTIES TIMEOUT 30
+    )
 endif()
